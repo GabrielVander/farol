@@ -119,8 +119,9 @@ Use these terms, and only these, in code, tests and discussion:
   addresses.
 - **Check:** find which tracked records have drifted without changing them.
 - **Sync:** check, then point every drifted record.
-- **Outcome:** what happened to one tracked record: unchanged, pointed or
-  failed.
+- **Outcome:** what a check or sync found for one tracked record: unchanged,
+  drifted (check only), pointed (sync only) or failed.
+- **Report:** the outcome of every tracked record in one check or sync.
 
 ## Canon TDD (Kent Beck)
 
