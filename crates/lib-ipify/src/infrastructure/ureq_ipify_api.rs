@@ -41,7 +41,10 @@ mod test {
         time::Duration,
     };
 
-    use crate::infrastructure::{adapters::ipify_api::IpifyApi, ureq_ipify_api::UreqIpifyApi};
+    use crate::infrastructure::{
+        adapters::ipify_api::{IpifyApi, IpifyApiError},
+        ureq_ipify_api::UreqIpifyApi,
+    };
 
     const TIMEOUT: Duration = Duration::from_secs(2);
 
@@ -69,5 +72,15 @@ mod test {
 
         assert_eq!(Ok("8.8.8.8".to_owned()), answer);
         assert_eq!("GET / HTTP/1.1\r\n", server.join().expect("server"));
+    }
+
+    #[test]
+    fn should_report_a_failed_status_as_unreachable() {
+        let (url, _server) =
+            serve_once("HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\n\r\n");
+
+        let answer = UreqIpifyApi::new(url, TIMEOUT).fetch_answer();
+
+        assert!(matches!(answer, Err(IpifyApiError::Unreachable(_))));
     }
 }
