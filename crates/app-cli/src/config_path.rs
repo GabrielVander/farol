@@ -3,10 +3,15 @@ use std::path::PathBuf;
 /// Where to read the config: `explicit` if given, otherwise the XDG location.
 pub fn config_path(
     explicit: Option<PathBuf>,
-    _environment: impl Fn(&str) -> Option<String>,
+    environment: impl Fn(&str) -> Option<String>,
 ) -> Option<PathBuf> {
-    explicit
+    explicit.or_else(|| {
+        let config_home = PathBuf::from(environment("XDG_CONFIG_HOME")?);
+        Some(config_home.join(FILE_IN_CONFIG_HOME))
+    })
 }
+
+const FILE_IN_CONFIG_HOME: &str = "farol/config.toml";
 
 #[cfg(test)]
 mod test {
@@ -32,5 +37,21 @@ mod test {
         );
 
         assert_eq!(Some(explicit), path);
+    }
+
+    #[test]
+    fn should_use_the_xdg_config_home() {
+        let path = config_path(
+            None,
+            environment(&[
+                ("XDG_CONFIG_HOME", "/home/me/.config"),
+                ("HOME", "/home/other"),
+            ]),
+        );
+
+        assert_eq!(
+            Some(PathBuf::from("/home/me/.config/farol/config.toml")),
+            path
+        );
     }
 }
