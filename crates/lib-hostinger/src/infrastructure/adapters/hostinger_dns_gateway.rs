@@ -25,14 +25,19 @@ impl<A: HostingerApi> DnsGateway for HostingerDnsGateway<A> {
         let record_sets = self.api.zone(record.domain.as_str()).map_err(
             |HostingerApiError::Unreachable(reason)| DnsGatewayError::Unavailable(reason),
         )?;
-        Ok(record_sets
+        record_sets
             .iter()
             .filter(|record_set| record_set.kind == ADDRESS_RECORD)
             .filter(|record_set| record_set.name == record.name.as_str())
             .flat_map(|record_set| &record_set.records)
             .filter(|value| !value.is_disabled)
-            .filter_map(|value| value.content.parse().ok())
-            .collect())
+            .map(|value| {
+                value
+                    .content
+                    .parse()
+                    .map_err(|_| DnsGatewayError::InvalidAnswer(value.content.clone()))
+            })
+            .collect()
     }
 
     fn point(&self, record: &TrackedRecord, public_ip: PublicIp) -> Result<(), DnsGatewayError> {
@@ -74,7 +79,7 @@ mod test {
             domain_name::DomainName, public_ip::PublicIp, record_name::RecordName,
             tracked_record::TrackedRecord, ttl::Ttl,
         },
-        use_cases::dns_gateway::DnsGateway,
+        use_cases::dns_gateway::{DnsGateway, DnsGatewayError},
     };
 
     use crate::infrastructure::{
@@ -208,5 +213,17 @@ mod test {
         let addresses = gateway.addresses_of(&tracked("home")).expect("addresses");
 
         assert!(addresses.is_empty());
+    }
+
+    #[test]
+    fn should_report_content_that_is_not_an_address_as_invalid() {
+        let api = FakeHostingerApi::default()
+            .with_zone("example.com", vec![record_set("home", "A", &["not-an-ip"])]);
+        let gateway = HostingerDnsGateway::new(api);
+
+        assert_eq!(
+            Err(DnsGatewayError::InvalidAnswer("not-an-ip".to_owned())),
+            gateway.addresses_of(&tracked("home"))
+        );
     }
 }
