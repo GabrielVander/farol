@@ -66,6 +66,7 @@ mod test {
 
     use crate::use_cases::{
         dns_gateway::DnsGatewayError,
+        public_ip_gateway::PublicIpGatewayError,
         report::{Outcome, RecordOutcome},
         sync_records::{SyncRecords, SyncRecordsUseCase},
         test_support::{
@@ -160,5 +161,18 @@ mod test {
             outcome: Outcome::Failed(error),
         };
         assert_eq!(vec![expected], report.records);
+    }
+
+    #[test]
+    fn should_stop_when_the_public_ip_is_unavailable() {
+        let error = PublicIpGatewayError::Unavailable("offline".to_owned());
+        let dns_gateway = Arc::new(FakeDnsGateway::default());
+        let sync = SyncRecords::new(
+            Arc::new(FakePublicIpGateway(Err(error.clone()))),
+            dns_gateway.clone(),
+        );
+
+        assert_eq!(Err(error), sync.execute(&[tracked("home")]));
+        assert!(dns_gateway.pointed().is_empty());
     }
 }
