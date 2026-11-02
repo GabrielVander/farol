@@ -21,6 +21,7 @@ impl TryFrom<&str> for DomainName {
     type Error = DomainNameError;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
+        let value = value.strip_suffix('.').unwrap_or(value);
         validate_length(value)?;
         value.split('.').try_for_each(validate_label)?;
         Ok(Self(value.to_ascii_lowercase()))
@@ -146,6 +147,13 @@ mod test {
     #[test]
     fn should_lowercase_the_domain() {
         let domain = DomainName::try_from("Example.COM").expect("valid domain");
+
+        assert_eq!("example.com", domain.as_str());
+    }
+
+    #[test]
+    fn should_drop_a_trailing_dot() {
+        let domain = DomainName::try_from("example.com.").expect("valid domain");
 
         assert_eq!("example.com", domain.as_str());
     }
