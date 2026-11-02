@@ -5,10 +5,14 @@ pub fn config_path(
     explicit: Option<PathBuf>,
     environment: impl Fn(&str) -> Option<String>,
 ) -> Option<PathBuf> {
-    explicit.or_else(|| {
-        let config_home = PathBuf::from(environment("XDG_CONFIG_HOME")?);
-        Some(config_home.join(FILE_IN_CONFIG_HOME))
-    })
+    explicit.or_else(|| Some(config_home(environment)?.join(FILE_IN_CONFIG_HOME)))
+}
+
+// The XDG Base Directory spec's default when XDG_CONFIG_HOME is unset.
+fn config_home(environment: impl Fn(&str) -> Option<String>) -> Option<PathBuf> {
+    environment("XDG_CONFIG_HOME")
+        .map(PathBuf::from)
+        .or_else(|| Some(PathBuf::from(environment("HOME")?).join(".config")))
 }
 
 const FILE_IN_CONFIG_HOME: &str = "farol/config.toml";
@@ -48,6 +52,16 @@ mod test {
                 ("HOME", "/home/other"),
             ]),
         );
+
+        assert_eq!(
+            Some(PathBuf::from("/home/me/.config/farol/config.toml")),
+            path
+        );
+    }
+
+    #[test]
+    fn should_fall_back_to_the_config_folder_in_home() {
+        let path = config_path(None, environment(&[("HOME", "/home/me")]));
 
         assert_eq!(
             Some(PathBuf::from("/home/me/.config/farol/config.toml")),
