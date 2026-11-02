@@ -31,6 +31,7 @@ impl Provider {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ConfigError {
     InvalidToml(String),
+    NoRecords,
     UnknownProvider(String),
     InvalidDomain {
         domain: String,
@@ -55,7 +56,10 @@ impl Config {
             .records
             .iter()
             .map(RawRecord::to_tracked)
-            .collect::<Result<_, _>>()?;
+            .collect::<Result<Vec<_>, _>>()?;
+        if records.is_empty() {
+            return Err(ConfigError::NoRecords);
+        }
         Ok(Self {
             provider: Provider::named(&raw.provider)?,
             records,
@@ -66,6 +70,7 @@ impl Config {
 #[derive(Deserialize)]
 struct RawConfig {
     provider: String,
+    #[serde(default)]
     records: Vec<RawRecord>,
 }
 
@@ -217,5 +222,13 @@ mod test {
             reason: TtlError::Zero,
         };
         assert_eq!(Err(expected), Config::parse(&text));
+    }
+
+    #[test]
+    fn should_reject_a_config_without_records() {
+        assert_eq!(
+            Err(ConfigError::NoRecords),
+            Config::parse(r#"provider = "hostinger""#)
+        );
     }
 }
