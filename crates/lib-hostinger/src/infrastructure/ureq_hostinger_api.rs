@@ -76,7 +76,10 @@ fn successful_body(mut response: Response<Body>) -> Result<String, HostingerApiE
 }
 
 fn status_error(status: u16, body: &str) -> HostingerApiError {
-    let error: ErrorBody = serde_json::from_str(body).unwrap_or_default();
+    let error = serde_json::from_str(body).unwrap_or_else(|_| ErrorBody {
+        message: body.to_owned(),
+        correlation_id: None,
+    });
     HostingerApiError::Status {
         status,
         message: error.message,
@@ -206,6 +209,20 @@ mod test {
             status: 401,
             message: "Unauthenticated.".to_owned(),
             correlation_id: Some("26a91bd9".to_owned()),
+        };
+        assert_eq!(Err(expected), zone);
+    }
+
+    #[test]
+    fn should_use_an_unexpected_error_body_as_the_message() {
+        let (base_url, _server) = serve_once("502 Bad Gateway", "<html>Bad Gateway</html>");
+
+        let zone = UreqHostingerApi::new(base_url, TOKEN.to_owned()).zone("example.com");
+
+        let expected = HostingerApiError::Status {
+            status: 502,
+            message: "<html>Bad Gateway</html>".to_owned(),
+            correlation_id: None,
         };
         assert_eq!(Err(expected), zone);
     }

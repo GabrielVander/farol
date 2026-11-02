@@ -25,7 +25,7 @@ pub struct UpdateZoneRequest {
 }
 
 /// The body Hostinger sends with an error status.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 pub struct ErrorBody {
     pub message: String,
     pub correlation_id: Option<String>,
