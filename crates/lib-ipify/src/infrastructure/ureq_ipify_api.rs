@@ -38,7 +38,7 @@ mod test {
         io::{BufRead, BufReader, Write},
         net::TcpListener,
         thread::{self, JoinHandle},
-        time::Duration,
+        time::{Duration, Instant},
     };
 
     use crate::infrastructure::{
@@ -94,5 +94,22 @@ mod test {
         let answer = UreqIpifyApi::new(url, TIMEOUT).fetch_answer();
 
         assert!(matches!(answer, Err(IpifyApiError::Unreachable(_))));
+    }
+
+    #[test]
+    fn should_give_up_after_the_timeout() {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+        let url = format!("http://{}/", listener.local_addr().expect("address"));
+        let _silent_server = thread::spawn(move || {
+            let connection = listener.accept();
+            thread::sleep(Duration::from_secs(3));
+            drop(connection);
+        });
+        let started = Instant::now();
+
+        let answer = UreqIpifyApi::new(url, Duration::from_millis(200)).fetch_answer();
+
+        assert!(matches!(answer, Err(IpifyApiError::Unreachable(_))));
+        assert!(started.elapsed() < Duration::from_secs(2));
     }
 }
