@@ -5,7 +5,7 @@ use lib_core::entities::{
     label::LabelError,
     record_name::RecordName,
     tracked_record::TrackedRecord,
-    ttl::Ttl,
+    ttl::{Ttl, TtlError},
 };
 use serde::Deserialize;
 
@@ -41,6 +41,11 @@ pub enum ConfigError {
     InvalidRecordName {
         name: String,
         reason: LabelError,
+    },
+    InvalidTtl {
+        domain: String,
+        name: String,
+        reason: TtlError,
     },
     Invalid(String),
 }
@@ -89,7 +94,11 @@ impl RawRecord {
                     reason,
                 }
             })?,
-            ttl: Ttl::try_from(self.ttl).map_err(invalid)?,
+            ttl: Ttl::try_from(self.ttl).map_err(|reason| ConfigError::InvalidTtl {
+                domain: self.domain.clone(),
+                name: self.name.clone(),
+                reason,
+            })?,
         })
     }
 }
@@ -105,7 +114,7 @@ mod test {
         label::LabelError,
         record_name::RecordName,
         tracked_record::TrackedRecord,
-        ttl::Ttl,
+        ttl::{Ttl, TtlError},
     };
 
     use crate::config::{Config, ConfigError, Provider};
@@ -193,6 +202,18 @@ mod test {
         let expected = ConfigError::InvalidRecordName {
             name: "-home".to_owned(),
             reason: LabelError::HyphenAtEdge,
+        };
+        assert_eq!(Err(expected), Config::parse(&text));
+    }
+
+    #[test]
+    fn should_reject_a_zero_ttl() {
+        let text = single_record("example.com", "home", 0);
+
+        let expected = ConfigError::InvalidTtl {
+            domain: "example.com".to_owned(),
+            name: "home".to_owned(),
+            reason: TtlError::Zero,
         };
         assert_eq!(Err(expected), Config::parse(&text));
     }
