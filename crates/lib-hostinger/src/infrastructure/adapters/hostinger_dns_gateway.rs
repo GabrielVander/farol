@@ -107,8 +107,17 @@ fn translate_error(error: HostingerApiError) -> DnsGatewayError {
     match error {
         HostingerApiError::Unreachable(reason) => DnsGatewayError::Unavailable(reason),
         HostingerApiError::Status {
-            status, message, ..
-        } => error_for_status(status)(message),
+            status,
+            message,
+            correlation_id,
+        } => error_for_status(status)(detail(message, correlation_id)),
+    }
+}
+
+fn detail(message: String, correlation_id: Option<String>) -> String {
+    match correlation_id {
+        Some(id) => format!("{message} (correlation id {id})"),
+        None => message,
     }
 }
 
@@ -398,6 +407,20 @@ mod test {
             reading_error(HostingerApiError::Unreachable(
                 "connection refused".to_owned()
             ))
+        );
+    }
+
+    #[test]
+    fn should_keep_the_correlation_id_in_the_error_detail() {
+        let error = HostingerApiError::Status {
+            status: 401,
+            message: "Unauthenticated.".to_owned(),
+            correlation_id: Some("26a91bd9".to_owned()),
+        };
+
+        assert_eq!(
+            DnsGatewayError::Unauthorized("Unauthenticated. (correlation id 26a91bd9)".to_owned()),
+            reading_error(error)
         );
     }
 }
