@@ -143,4 +143,22 @@ mod test {
         ];
         assert_eq!(expected, report.records);
     }
+
+    #[test]
+    fn should_report_failed_when_reading_fails() {
+        let error = DnsGatewayError::Unavailable("timeout".to_owned());
+        let dns_gateway = FakeDnsGateway::default().with_read_failure("home", error.clone());
+        let sync = SyncRecords::new(
+            Arc::new(FakePublicIpGateway(Ok(public_ip()))),
+            Arc::new(dns_gateway),
+        );
+
+        let report = sync.execute(&[tracked("home")]).expect("report");
+
+        let expected = RecordOutcome {
+            record: tracked("home"),
+            outcome: Outcome::Failed(error),
+        };
+        assert_eq!(vec![expected], report.records);
+    }
 }
