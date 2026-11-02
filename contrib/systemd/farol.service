@@ -1,0 +1,26 @@
+[Unit]
+Description=Point DNS A records at this machine's public IP
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/farol --config /etc/farol/config.toml sync
+# Holds FAROL_HOSTINGER_TOKEN=... ; systemd reads it as root, so keep it 0600.
+EnvironmentFile=/etc/farol/farol.env
+
+DynamicUser=yes
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6
+RestrictNamespaces=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
