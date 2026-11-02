@@ -6,3 +6,4 @@ license.workspace = true
 
 [dependencies]
 lib-core = { workspace = true }
+ureq = { workspace = true }
