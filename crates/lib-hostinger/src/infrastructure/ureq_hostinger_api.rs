@@ -1,10 +1,10 @@
-use std::time::Duration;
+use std::{fmt::Display, time::Duration};
 
-use ureq::Agent;
+use ureq::{Agent, Body, http::Response};
 
 use crate::infrastructure::{
     adapters::hostinger_api::{HostingerApi, HostingerApiError},
-    models::{RecordSet, UpdateZoneRequest},
+    models::{ErrorBody, RecordSet, UpdateZoneRequest},
 };
 
 const ZONES_PATH: &str = "/api/dns/v1/zones/";
@@ -21,6 +21,7 @@ impl UreqHostingerApi {
     pub fn new(base_url: String, token: String) -> Self {
         let config = Agent::config_builder()
             .timeout_global(Some(TIMEOUT))
+            .http_status_as_error(false)
             .build();
         Self {
             base_url,
@@ -40,15 +41,14 @@ impl UreqHostingerApi {
 
 impl HostingerApi for UreqHostingerApi {
     fn zone(&self, domain: &str) -> Result<Vec<RecordSet>, HostingerApiError> {
-        let body = self
+        let response = self
             .agent
             .get(self.zone_url(domain))
             .header("Authorization", self.authorization())
             .call()
-            .and_then(|mut response| response.body_mut().read_to_string())
-            .map_err(|error| HostingerApiError::Unreachable(error.to_string()))?;
-        serde_json::from_str(&body)
-            .map_err(|error| HostingerApiError::Unreachable(error.to_string()))
+            .map_err(unreachable)?;
+        let body = successful_body(response)?;
+        serde_json::from_str(&body).map_err(unreachable)
     }
 
     fn update_zone(
@@ -56,13 +56,36 @@ impl HostingerApi for UreqHostingerApi {
         domain: &str,
         request: &UpdateZoneRequest,
     ) -> Result<(), HostingerApiError> {
-        self.agent
+        let response = self
+            .agent
             .put(self.zone_url(domain))
             .header("Authorization", self.authorization())
             .send_json(request)
-            .map(|_| ())
-            .map_err(|error| HostingerApiError::Unreachable(error.to_string()))
+            .map_err(unreachable)?;
+        successful_body(response).map(|_| ())
     }
+}
+
+fn successful_body(mut response: Response<Body>) -> Result<String, HostingerApiError> {
+    let status = response.status();
+    let body = response.body_mut().read_to_string().map_err(unreachable)?;
+    if status.is_success() {
+        return Ok(body);
+    }
+    Err(status_error(status.as_u16(), &body))
+}
+
+fn status_error(status: u16, body: &str) -> HostingerApiError {
+    let error: ErrorBody = serde_json::from_str(body).unwrap_or_default();
+    HostingerApiError::Status {
+        status,
+        message: error.message,
+        correlation_id: error.correlation_id,
+    }
+}
+
+fn unreachable(error: impl Display) -> HostingerApiError {
+    HostingerApiError::Unreachable(error.to_string())
 }
 
 #[cfg(test)]
@@ -76,7 +99,7 @@ mod test {
     use serde_json::{Value, json};
 
     use crate::infrastructure::{
-        adapters::hostinger_api::HostingerApi,
+        adapters::hostinger_api::{HostingerApi, HostingerApiError},
         models::{RecordSet, RecordValue, UpdateZoneRequest},
         ureq_hostinger_api::UreqHostingerApi,
     };
@@ -168,5 +191,22 @@ mod test {
             "zone": [{"name": "home", "type": "A", "ttl": 300, "records": [{"content": "8.8.8.8"}]}]
         });
         assert_eq!(expected, serde_json::from_str::<Value>(body).expect("json"));
+    }
+
+    #[test]
+    fn should_report_an_error_status_with_hostingers_message() {
+        let (base_url, _server) = serve_once(
+            "401 Unauthorized",
+            r#"{"message":"Unauthenticated.","correlation_id":"26a91bd9"}"#,
+        );
+
+        let zone = UreqHostingerApi::new(base_url, TOKEN.to_owned()).zone("example.com");
+
+        let expected = HostingerApiError::Status {
+            status: 401,
+            message: "Unauthenticated.".to_owned(),
+            correlation_id: Some("26a91bd9".to_owned()),
+        };
+        assert_eq!(Err(expected), zone);
     }
 }

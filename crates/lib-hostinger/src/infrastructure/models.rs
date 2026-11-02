@@ -23,3 +23,10 @@ pub struct UpdateZoneRequest {
     pub overwrite: bool,
     pub zone: Vec<RecordSet>,
 }
+
+/// The body Hostinger sends with an error status.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+pub struct ErrorBody {
+    pub message: String,
+    pub correlation_id: Option<String>,
+}
