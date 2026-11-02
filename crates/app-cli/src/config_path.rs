@@ -68,4 +68,9 @@ mod test {
             path
         );
     }
+
+    #[test]
+    fn should_find_no_path_without_a_home() {
+        assert_eq!(None, config_path(None, environment(&[])));
+    }
 }
