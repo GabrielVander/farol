@@ -26,6 +26,7 @@ fn describe(outcome: &Outcome) -> String {
     match outcome {
         Outcome::Unchanged => "unchanged".to_owned(),
         Outcome::Drifted { addresses } => format!("drifted (now {})", list(addresses)),
+        Outcome::Pointed { previous } => format!("pointed (was {})", list(previous)),
         _ => String::new(),
     }
 }
@@ -112,6 +113,16 @@ mod test {
         assert_eq!(
             "home.example.com: drifted (now no A record)",
             record_line(&report_with("home", Outcome::Drifted { addresses: vec![] }))
+        );
+    }
+
+    #[test]
+    fn should_render_a_pointed_record_with_its_previous_addresses() {
+        let previous = vec![Ipv4Addr::new(1, 1, 1, 1)];
+
+        assert_eq!(
+            "home.example.com: pointed (was 1.1.1.1)",
+            record_line(&report_with("home", Outcome::Pointed { previous }))
         );
     }
 }
