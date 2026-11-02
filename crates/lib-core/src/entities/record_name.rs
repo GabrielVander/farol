@@ -18,7 +18,7 @@ impl TryFrom<&str> for RecordName {
         if value != APEX {
             validate_labels(value)?;
         }
-        Ok(Self(value.to_owned()))
+        Ok(Self(value.to_ascii_lowercase()))
     }
 }
 
@@ -39,5 +39,19 @@ mod test {
             Err(LabelError::InvalidCharacter('_')),
             RecordName::try_from("ho_me")
         );
+    }
+
+    #[test]
+    fn should_accept_nested_labels() {
+        let name = RecordName::try_from("home.lab").expect("valid record name");
+
+        assert_eq!("home.lab", name.as_str());
+    }
+
+    #[test]
+    fn should_lowercase_the_record_name() {
+        let name = RecordName::try_from("Home").expect("valid record name");
+
+        assert_eq!("home", name.as_str());
     }
 }
