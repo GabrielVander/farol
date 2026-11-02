@@ -37,6 +37,7 @@ impl PublicIpGateway for FakePublicIpGateway {
 #[derive(Default)]
 pub(crate) struct FakeDnsGateway {
     addresses: HashMap<String, Result<Vec<Ipv4Addr>, DnsGatewayError>>,
+    point_failures: HashMap<String, DnsGatewayError>,
     pointed: Mutex<Vec<(TrackedRecord, PublicIp)>>,
 }
 
@@ -52,6 +53,11 @@ impl FakeDnsGateway {
         self
     }
 
+    pub(crate) fn with_point_failure(mut self, name: &str, error: DnsGatewayError) -> Self {
+        self.point_failures.insert(name.to_owned(), error);
+        self
+    }
+
     pub(crate) fn pointed(&self) -> Vec<(TrackedRecord, PublicIp)> {
         self.pointed.lock().expect("unpoisoned").clone()
     }
@@ -64,6 +70,9 @@ impl DnsGateway for FakeDnsGateway {
     }
 
     fn point(&self, record: &TrackedRecord, public_ip: PublicIp) -> Result<(), DnsGatewayError> {
+        if let Some(error) = self.point_failures.get(record.name.as_str()) {
+            return Err(error.clone());
+        }
         let mut pointed = self.pointed.lock().expect("unpoisoned");
         pointed.push((record.clone(), public_ip));
         Ok(())

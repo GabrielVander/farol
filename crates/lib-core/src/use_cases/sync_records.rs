@@ -45,12 +45,12 @@ impl<P: PublicIpGateway, D: DnsGateway> SyncRecordsUseCase for SyncRecords<P, D>
 impl<P: PublicIpGateway, D: DnsGateway> SyncRecords<P, D> {
     fn sync(&self, checked: RecordOutcome, public_ip: PublicIp) -> RecordOutcome {
         let outcome = match checked.outcome {
-            Outcome::Drifted { addresses } => {
-                let _ = self.dns_gateway.point(&checked.record, public_ip);
-                Outcome::Pointed {
+            Outcome::Drifted { addresses } => self
+                .dns_gateway
+                .point(&checked.record, public_ip)
+                .map_or_else(Outcome::Failed, |()| Outcome::Pointed {
                     previous: addresses,
-                }
-            }
+                }),
             other => other,
         };
         RecordOutcome {
@@ -65,6 +65,7 @@ mod test {
     use std::sync::Arc;
 
     use crate::use_cases::{
+        dns_gateway::DnsGatewayError,
         report::{Outcome, RecordOutcome},
         sync_records::{SyncRecords, SyncRecordsUseCase},
         test_support::{
@@ -110,5 +111,36 @@ mod test {
         };
         assert_eq!(vec![expected], report.records);
         assert_eq!(vec![(tracked("home"), public_ip())], dns_gateway.pointed());
+    }
+
+    #[test]
+    fn should_report_failed_when_pointing_fails_and_sync_the_rest() {
+        let error = DnsGatewayError::Unavailable("rejected".to_owned());
+        let dns_gateway = FakeDnsGateway::default()
+            .with_addresses("home", &[OLD_ADDRESS])
+            .with_point_failure("home", error.clone())
+            .with_addresses("lab", &[OLD_ADDRESS]);
+        let sync = SyncRecords::new(
+            Arc::new(FakePublicIpGateway(Ok(public_ip()))),
+            Arc::new(dns_gateway),
+        );
+
+        let report = sync
+            .execute(&[tracked("home"), tracked("lab")])
+            .expect("report");
+
+        let expected = vec![
+            RecordOutcome {
+                record: tracked("home"),
+                outcome: Outcome::Failed(error),
+            },
+            RecordOutcome {
+                record: tracked("lab"),
+                outcome: Outcome::Pointed {
+                    previous: vec![OLD_ADDRESS],
+                },
+            },
+        ];
+        assert_eq!(expected, report.records);
     }
 }
