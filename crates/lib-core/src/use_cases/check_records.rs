@@ -186,4 +186,18 @@ mod test {
 
         assert_eq!(Err(error), check.execute(&[tracked("home")]));
     }
+
+    #[test]
+    fn should_never_point_a_drifted_record() {
+        let dns_gateway =
+            Arc::new(FakeDnsGateway::default().with_addresses("home", &[OLD_ADDRESS]));
+        let check = CheckRecords::new(
+            Arc::new(FakePublicIpGateway(Ok(public_ip()))),
+            dns_gateway.clone(),
+        );
+
+        check.execute(&[tracked("home")]).expect("report");
+
+        assert!(dns_gateway.pointed().is_empty());
+    }
 }
