@@ -52,19 +52,18 @@ impl Config {
     pub fn parse(text: &str) -> Result<Self, ConfigError> {
         let raw: RawConfig =
             toml::from_str(text).map_err(|error| ConfigError::InvalidToml(error.to_string()))?;
-        let records = raw
-            .records
-            .iter()
-            .map(RawRecord::to_tracked)
-            .collect::<Result<Vec<_>, _>>()?;
-        if records.is_empty() {
-            return Err(ConfigError::NoRecords);
-        }
         Ok(Self {
             provider: Provider::named(&raw.provider)?,
-            records,
+            records: tracked_records(&raw.records)?,
         })
     }
+}
+
+fn tracked_records(raw_records: &[RawRecord]) -> Result<Vec<TrackedRecord>, ConfigError> {
+    if raw_records.is_empty() {
+        return Err(ConfigError::NoRecords);
+    }
+    raw_records.iter().map(RawRecord::to_tracked).collect()
 }
 
 #[derive(Deserialize)]
