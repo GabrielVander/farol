@@ -1,3 +1,5 @@
+use std::net::Ipv4Addr;
+
 use crate::entities::public_ip::PublicIp;
 
 pub trait PublicIpGateway {
@@ -8,4 +10,5 @@ pub trait PublicIpGateway {
 pub enum PublicIpGatewayError {
     Unavailable(String),
     InvalidAnswer(String),
+    NotPublic(Ipv4Addr),
 }
