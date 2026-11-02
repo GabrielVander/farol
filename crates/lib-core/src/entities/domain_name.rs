@@ -1,3 +1,5 @@
+use crate::entities::label::{LabelError, validate_labels};
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DomainName(String);
 
@@ -11,10 +13,13 @@ impl DomainName {
 pub enum DomainNameError {
     Empty,
     TooLong,
-    EmptyLabel,
-    LabelTooLong,
-    InvalidCharacter(char),
-    HyphenAtLabelEdge,
+    Label(LabelError),
+}
+
+impl From<LabelError> for DomainNameError {
+    fn from(error: LabelError) -> Self {
+        Self::Label(error)
+    }
 }
 
 impl TryFrom<&str> for DomainName {
@@ -23,13 +28,12 @@ impl TryFrom<&str> for DomainName {
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         let value = value.strip_suffix('.').unwrap_or(value);
         validate_length(value)?;
-        value.split('.').try_for_each(validate_label)?;
+        validate_labels(value)?;
         Ok(Self(value.to_ascii_lowercase()))
     }
 }
 
 const MAX_DOMAIN_LENGTH: usize = 253;
-const MAX_LABEL_LENGTH: usize = 63;
 
 fn validate_length(domain: &str) -> Result<(), DomainNameError> {
     if domain.is_empty() {
@@ -41,43 +45,12 @@ fn validate_length(domain: &str) -> Result<(), DomainNameError> {
     Ok(())
 }
 
-fn validate_label(label: &str) -> Result<(), DomainNameError> {
-    validate_label_length(label)?;
-    validate_label_characters(label)?;
-    validate_label_edges(label)
-}
-
-fn validate_label_length(label: &str) -> Result<(), DomainNameError> {
-    if label.is_empty() {
-        return Err(DomainNameError::EmptyLabel);
-    }
-    if label.len() > MAX_LABEL_LENGTH {
-        return Err(DomainNameError::LabelTooLong);
-    }
-    Ok(())
-}
-
-fn validate_label_characters(label: &str) -> Result<(), DomainNameError> {
-    match label.chars().find(|c| !is_label_character(*c)) {
-        Some(invalid) => Err(DomainNameError::InvalidCharacter(invalid)),
-        None => Ok(()),
-    }
-}
-
-fn validate_label_edges(label: &str) -> Result<(), DomainNameError> {
-    if label.starts_with('-') || label.ends_with('-') {
-        return Err(DomainNameError::HyphenAtLabelEdge);
-    }
-    Ok(())
-}
-
-fn is_label_character(character: char) -> bool {
-    character.is_ascii_alphanumeric() || character == '-'
-}
-
 #[cfg(test)]
 mod test {
-    use crate::entities::domain_name::{DomainName, DomainNameError};
+    use crate::entities::{
+        domain_name::{DomainName, DomainNameError},
+        label::LabelError,
+    };
 
     #[test]
     fn should_accept_a_valid_domain() {
@@ -96,7 +69,7 @@ mod test {
         let domain = format!("{}.com", "a".repeat(64));
 
         assert_eq!(
-            Err(DomainNameError::LabelTooLong),
+            Err(DomainNameError::Label(LabelError::TooLong)),
             DomainName::try_from(domain.as_str())
         );
     }
@@ -115,7 +88,7 @@ mod test {
     #[test]
     fn should_reject_invalid_characters() {
         assert_eq!(
-            Err(DomainNameError::InvalidCharacter('_')),
+            Err(DomainNameError::Label(LabelError::InvalidCharacter('_'))),
             DomainName::try_from("exa_mple.com")
         );
     }
@@ -123,7 +96,7 @@ mod test {
     #[test]
     fn should_reject_an_empty_label() {
         assert_eq!(
-            Err(DomainNameError::EmptyLabel),
+            Err(DomainNameError::Label(LabelError::Empty)),
             DomainName::try_from("example..com")
         );
     }
@@ -131,7 +104,7 @@ mod test {
     #[test]
     fn should_reject_a_label_starting_with_a_hyphen() {
         assert_eq!(
-            Err(DomainNameError::HyphenAtLabelEdge),
+            Err(DomainNameError::Label(LabelError::HyphenAtEdge)),
             DomainName::try_from("-example.com")
         );
     }
@@ -139,7 +112,7 @@ mod test {
     #[test]
     fn should_reject_a_label_ending_with_a_hyphen() {
         assert_eq!(
-            Err(DomainNameError::HyphenAtLabelEdge),
+            Err(DomainNameError::Label(LabelError::HyphenAtEdge)),
             DomainName::try_from("example-.com")
         );
     }
