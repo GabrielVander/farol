@@ -44,10 +44,13 @@ impl<P: PublicIpGateway, D: DnsGateway> CheckRecordsUseCase for CheckRecords<P, 
 
 impl<P: PublicIpGateway, D: DnsGateway> CheckRecords<P, D> {
     fn check(&self, record: &TrackedRecord, public_ip: PublicIp) -> RecordOutcome {
-        let addresses = self.dns_gateway.addresses_of(record).unwrap_or_default();
+        let outcome = match self.dns_gateway.addresses_of(record) {
+            Ok(addresses) => outcome_of(addresses, public_ip),
+            Err(error) => Outcome::Failed(error),
+        };
         RecordOutcome {
             record: record.clone(),
-            outcome: outcome_of(addresses, public_ip),
+            outcome,
         }
     }
 }
@@ -67,6 +70,7 @@ mod test {
         entities::report::{Outcome, RecordOutcome},
         use_cases::{
             check_records::{CheckRecords, CheckRecordsUseCase},
+            dns_gateway::DnsGatewayError,
             test_support::{
                 FakeDnsGateway, FakePublicIpGateway, OLD_ADDRESS, PUBLIC_ADDRESS, public_ip,
                 tracked,
@@ -144,5 +148,33 @@ mod test {
             },
         };
         assert_eq!(vec![expected], report.records);
+    }
+
+    #[test]
+    fn should_report_failed_when_reading_fails_and_check_the_rest() {
+        let error = DnsGatewayError::Unavailable("timeout".to_owned());
+        let dns_gateway = FakeDnsGateway::default()
+            .with_read_failure("home", error.clone())
+            .with_addresses("lab", &[PUBLIC_ADDRESS]);
+        let check = CheckRecords::new(
+            Arc::new(FakePublicIpGateway(Ok(public_ip()))),
+            Arc::new(dns_gateway),
+        );
+
+        let report = check
+            .execute(&[tracked("home"), tracked("lab")])
+            .expect("report");
+
+        let expected = vec![
+            RecordOutcome {
+                record: tracked("home"),
+                outcome: Outcome::Failed(error),
+            },
+            RecordOutcome {
+                record: tracked("lab"),
+                outcome: Outcome::Unchanged,
+            },
+        ];
+        assert_eq!(expected, report.records);
     }
 }

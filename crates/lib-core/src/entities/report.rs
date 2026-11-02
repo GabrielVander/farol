@@ -1,6 +1,6 @@
 use std::net::Ipv4Addr;
 
-use crate::entities::tracked_record::TrackedRecord;
+use crate::{entities::tracked_record::TrackedRecord, use_cases::dns_gateway::DnsGatewayError};
 
 /// What a check or a sync found for every tracked record.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -18,4 +18,5 @@ pub struct RecordOutcome {
 pub enum Outcome {
     Unchanged,
     Drifted { addresses: Vec<Ipv4Addr> },
+    Failed(DnsGatewayError),
 }

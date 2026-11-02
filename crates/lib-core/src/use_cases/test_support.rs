@@ -45,6 +45,11 @@ impl FakeDnsGateway {
             .insert(name.to_owned(), Ok(addresses.to_vec()));
         self
     }
+
+    pub(crate) fn with_read_failure(mut self, name: &str, error: DnsGatewayError) -> Self {
+        self.addresses.insert(name.to_owned(), Err(error));
+        self
+    }
 }
 
 impl DnsGateway for FakeDnsGateway {
