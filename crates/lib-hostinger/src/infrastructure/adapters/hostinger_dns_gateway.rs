@@ -107,26 +107,18 @@ fn translate_error(error: HostingerApiError) -> DnsGatewayError {
     match error {
         HostingerApiError::Unreachable(reason) => DnsGatewayError::Unavailable(reason),
         HostingerApiError::Status {
-            status: 401,
-            message,
-            ..
-        } => DnsGatewayError::Unauthorized(message),
-        HostingerApiError::Status {
-            status: 404,
-            message,
-            ..
-        } => DnsGatewayError::DomainNotFound(message),
-        HostingerApiError::Status {
-            status: 422,
-            message,
-            ..
-        } => DnsGatewayError::Rejected(message),
-        HostingerApiError::Status {
-            status: 429,
-            message,
-            ..
-        } => DnsGatewayError::RateLimited(message),
-        HostingerApiError::Status { message, .. } => DnsGatewayError::Unavailable(message),
+            status, message, ..
+        } => error_for_status(status)(message),
+    }
+}
+
+fn error_for_status(status: u16) -> fn(String) -> DnsGatewayError {
+    match status {
+        401 => DnsGatewayError::Unauthorized,
+        404 => DnsGatewayError::DomainNotFound,
+        422 => DnsGatewayError::Rejected,
+        429 => DnsGatewayError::RateLimited,
+        _ => DnsGatewayError::Unavailable,
     }
 }
 
