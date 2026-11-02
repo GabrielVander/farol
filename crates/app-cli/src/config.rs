@@ -17,9 +17,19 @@ pub enum Provider {
     Hostinger,
 }
 
+impl Provider {
+    fn named(name: &str) -> Result<Self, ConfigError> {
+        match name {
+            "hostinger" => Ok(Self::Hostinger),
+            unknown => Err(ConfigError::UnknownProvider(unknown.to_owned())),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ConfigError {
     InvalidToml(String),
+    UnknownProvider(String),
     Invalid(String),
 }
 
@@ -33,7 +43,7 @@ impl Config {
             .map(RawRecord::to_tracked)
             .collect::<Result<_, _>>()?;
         Ok(Self {
-            provider: Provider::Hostinger,
+            provider: Provider::named(&raw.provider)?,
             records,
         })
     }
@@ -41,6 +51,7 @@ impl Config {
 
 #[derive(Deserialize)]
 struct RawConfig {
+    provider: String,
     records: Vec<RawRecord>,
 }
 
@@ -113,5 +124,22 @@ mod test {
             Config::parse("provider = "),
             Err(ConfigError::InvalidToml(_))
         ));
+    }
+
+    #[test]
+    fn should_reject_an_unknown_provider() {
+        let text = r#"
+            provider = "cloudflare"
+
+            [[records]]
+            domain = "example.com"
+            name = "@"
+            ttl = 300
+        "#;
+
+        assert_eq!(
+            Err(ConfigError::UnknownProvider("cloudflare".to_owned())),
+            Config::parse(text)
+        );
     }
 }
