@@ -1,4 +1,6 @@
-use std::convert::Infallible;
+use crate::entities::label::{LabelError, validate_labels};
+
+const APEX: &str = "@";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RecordName(String);
@@ -10,21 +12,32 @@ impl RecordName {
 }
 
 impl TryFrom<&str> for RecordName {
-    type Error = Infallible;
+    type Error = LabelError;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
+        if value != APEX {
+            validate_labels(value)?;
+        }
         Ok(Self(value.to_owned()))
     }
 }
 
 #[cfg(test)]
 mod test {
-    use crate::entities::record_name::RecordName;
+    use crate::entities::{label::LabelError, record_name::RecordName};
 
     #[test]
     fn should_accept_the_apex() {
         let name = RecordName::try_from("@").expect("valid record name");
 
         assert_eq!("@", name.as_str());
+    }
+
+    #[test]
+    fn should_reject_an_invalid_label() {
+        assert_eq!(
+            Err(LabelError::InvalidCharacter('_')),
+            RecordName::try_from("ho_me")
+        );
     }
 }
