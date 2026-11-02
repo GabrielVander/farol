@@ -1,4 +1,8 @@
-use std::net::Ipv4Addr;
+use std::{
+    collections::HashMap,
+    net::Ipv4Addr,
+    sync::{Mutex, PoisonError},
+};
 
 use lib_core::{
     entities::{public_ip::PublicIp, tracked_record::TrackedRecord},
@@ -12,20 +16,31 @@ use crate::infrastructure::{
 
 pub struct HostingerDnsGateway<A: HostingerApi> {
     api: A,
+    zones: Mutex<HashMap<String, Vec<RecordSet>>>,
 }
 
 impl<A: HostingerApi> HostingerDnsGateway<A> {
     pub fn new(api: A) -> Self {
-        Self { api }
+        Self {
+            api,
+            zones: Mutex::default(),
+        }
+    }
+
+    fn zone(&self, domain: &str) -> Result<Vec<RecordSet>, DnsGatewayError> {
+        let mut zones = self.zones.lock().unwrap_or_else(PoisonError::into_inner);
+        if let Some(record_sets) = zones.get(domain) {
+            return Ok(record_sets.clone());
+        }
+        let record_sets = self.api.zone(domain).map_err(translate_error)?;
+        zones.insert(domain.to_owned(), record_sets.clone());
+        Ok(record_sets)
     }
 }
 
 impl<A: HostingerApi> DnsGateway for HostingerDnsGateway<A> {
     fn addresses_of(&self, record: &TrackedRecord) -> Result<Vec<Ipv4Addr>, DnsGatewayError> {
-        let record_sets = self
-            .api
-            .zone(record.domain.as_str())
-            .map_err(translate_error)?;
+        let record_sets = self.zone(record.domain.as_str())?;
         addresses_in(&record_sets, record)
     }
 
@@ -110,12 +125,17 @@ mod test {
     struct FakeHostingerApi {
         zones: HashMap<String, Vec<RecordSet>>,
         updates: Mutex<Vec<(String, UpdateZoneRequest)>>,
+        zone_reads: Mutex<usize>,
     }
 
     impl FakeHostingerApi {
         fn with_zone(mut self, domain: &str, record_sets: Vec<RecordSet>) -> Self {
             self.zones.insert(domain.to_owned(), record_sets);
             self
+        }
+
+        fn zone_reads(&self) -> usize {
+            *self.zone_reads.lock().expect("unpoisoned")
         }
 
         fn updates(&self) -> Vec<(String, UpdateZoneRequest)> {
@@ -125,6 +145,7 @@ mod test {
 
     impl HostingerApi for FakeHostingerApi {
         fn zone(&self, domain: &str) -> Result<Vec<RecordSet>, HostingerApiError> {
+            *self.zone_reads.lock().expect("unpoisoned") += 1;
             Ok(self.zones.get(domain).cloned().unwrap_or_default())
         }
 
@@ -241,5 +262,22 @@ mod test {
             Err(DnsGatewayError::InvalidAnswer("not-an-ip".to_owned())),
             gateway.addresses_of(&tracked("home"))
         );
+    }
+
+    #[test]
+    fn should_read_each_zone_once() {
+        let api = FakeHostingerApi::default().with_zone(
+            "example.com",
+            vec![
+                record_set("@", "A", &["8.8.8.8"]),
+                record_set("home", "A", &["8.8.8.8"]),
+            ],
+        );
+        let gateway = HostingerDnsGateway::new(api);
+
+        gateway.addresses_of(&tracked("@")).expect("addresses");
+        gateway.addresses_of(&tracked("home")).expect("addresses");
+
+        assert_eq!(1, gateway.api.zone_reads());
     }
 }
