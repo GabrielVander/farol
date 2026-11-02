@@ -1,7 +1,10 @@
 use std::fmt::Debug;
 
 use lib_core::entities::{
-    domain_name::DomainName, record_name::RecordName, tracked_record::TrackedRecord, ttl::Ttl,
+    domain_name::{DomainName, DomainNameError},
+    record_name::RecordName,
+    tracked_record::TrackedRecord,
+    ttl::Ttl,
 };
 use serde::Deserialize;
 
@@ -30,6 +33,10 @@ impl Provider {
 pub enum ConfigError {
     InvalidToml(String),
     UnknownProvider(String),
+    InvalidDomain {
+        domain: String,
+        reason: DomainNameError,
+    },
     Invalid(String),
 }
 
@@ -65,7 +72,12 @@ struct RawRecord {
 impl RawRecord {
     fn to_tracked(&self) -> Result<TrackedRecord, ConfigError> {
         Ok(TrackedRecord {
-            domain: DomainName::try_from(self.domain.as_str()).map_err(invalid)?,
+            domain: DomainName::try_from(self.domain.as_str()).map_err(|reason| {
+                ConfigError::InvalidDomain {
+                    domain: self.domain.clone(),
+                    reason,
+                }
+            })?,
             name: RecordName::try_from(self.name.as_str()).map_err(invalid)?,
             ttl: Ttl::try_from(self.ttl).map_err(invalid)?,
         })
@@ -79,10 +91,20 @@ fn invalid(error: impl Debug) -> ConfigError {
 #[cfg(test)]
 mod test {
     use lib_core::entities::{
-        domain_name::DomainName, record_name::RecordName, tracked_record::TrackedRecord, ttl::Ttl,
+        domain_name::{DomainName, DomainNameError},
+        label::LabelError,
+        record_name::RecordName,
+        tracked_record::TrackedRecord,
+        ttl::Ttl,
     };
 
     use crate::config::{Config, ConfigError, Provider};
+
+    fn single_record(domain: &str, name: &str, ttl: u32) -> String {
+        format!(
+            "provider = \"hostinger\"\n[[records]]\ndomain = \"{domain}\"\nname = \"{name}\"\nttl = {ttl}\n"
+        )
+    }
 
     fn tracked(domain: &str, name: &str, ttl: u32) -> TrackedRecord {
         TrackedRecord {
@@ -141,5 +163,16 @@ mod test {
             Err(ConfigError::UnknownProvider("cloudflare".to_owned())),
             Config::parse(text)
         );
+    }
+
+    #[test]
+    fn should_reject_an_invalid_domain_and_name_it() {
+        let text = single_record("exa_mple.com", "@", 300);
+
+        let expected = ConfigError::InvalidDomain {
+            domain: "exa_mple.com".to_owned(),
+            reason: DomainNameError::Label(LabelError::InvalidCharacter('_')),
+        };
+        assert_eq!(Err(expected), Config::parse(&text));
     }
 }
