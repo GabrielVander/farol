@@ -14,4 +14,5 @@ pub enum DnsGatewayError {
     InvalidAnswer(String),
     Unauthorized(String),
     DomainNotFound(String),
+    Rejected(String),
 }
