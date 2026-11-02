@@ -22,22 +22,11 @@ impl<A: HostingerApi> HostingerDnsGateway<A> {
 
 impl<A: HostingerApi> DnsGateway for HostingerDnsGateway<A> {
     fn addresses_of(&self, record: &TrackedRecord) -> Result<Vec<Ipv4Addr>, DnsGatewayError> {
-        let record_sets = self.api.zone(record.domain.as_str()).map_err(
-            |HostingerApiError::Unreachable(reason)| DnsGatewayError::Unavailable(reason),
-        )?;
-        record_sets
-            .iter()
-            .filter(|record_set| record_set.kind == ADDRESS_RECORD)
-            .filter(|record_set| record_set.name == record.name.as_str())
-            .flat_map(|record_set| &record_set.records)
-            .filter(|value| !value.is_disabled)
-            .map(|value| {
-                value
-                    .content
-                    .parse()
-                    .map_err(|_| DnsGatewayError::InvalidAnswer(value.content.clone()))
-            })
-            .collect()
+        let record_sets = self
+            .api
+            .zone(record.domain.as_str())
+            .map_err(translate_error)?;
+        addresses_in(&record_sets, record)
     }
 
     fn point(&self, record: &TrackedRecord, public_ip: PublicIp) -> Result<(), DnsGatewayError> {
@@ -50,8 +39,39 @@ impl<A: HostingerApi> DnsGateway for HostingerDnsGateway<A> {
 
 const ADDRESS_RECORD: &str = "A";
 
+fn addresses_in(
+    record_sets: &[RecordSet],
+    record: &TrackedRecord,
+) -> Result<Vec<Ipv4Addr>, DnsGatewayError> {
+    record_sets
+        .iter()
+        .filter(|record_set| holds_addresses_of(record_set, record))
+        .flat_map(|record_set| &record_set.records)
+        .filter(|value| !value.is_disabled)
+        .map(parse_address)
+        .collect()
+}
+
+fn holds_addresses_of(record_set: &RecordSet, record: &TrackedRecord) -> bool {
+    record_set.kind == ADDRESS_RECORD && record_set.name == record.name.as_str()
+}
+
+fn parse_address(value: &RecordValue) -> Result<Ipv4Addr, DnsGatewayError> {
+    value
+        .content
+        .parse()
+        .map_err(|_| DnsGatewayError::InvalidAnswer(value.content.clone()))
+}
+
 fn overwrite_request(record: &TrackedRecord, public_ip: PublicIp) -> UpdateZoneRequest {
-    let record_set = RecordSet {
+    UpdateZoneRequest {
+        overwrite: true,
+        zone: vec![record_set_pointing(record, public_ip)],
+    }
+}
+
+fn record_set_pointing(record: &TrackedRecord, public_ip: PublicIp) -> RecordSet {
+    RecordSet {
         name: record.name.as_str().to_owned(),
         kind: ADDRESS_RECORD.to_owned(),
         ttl: record.ttl.seconds(),
@@ -59,10 +79,6 @@ fn overwrite_request(record: &TrackedRecord, public_ip: PublicIp) -> UpdateZoneR
             content: public_ip.address().to_string(),
             is_disabled: false,
         }],
-    };
-    UpdateZoneRequest {
-        overwrite: true,
-        zone: vec![record_set],
     }
 }
 
