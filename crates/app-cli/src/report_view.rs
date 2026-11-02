@@ -2,7 +2,10 @@ use std::net::Ipv4Addr;
 
 use lib_core::{
     entities::tracked_record::TrackedRecord,
-    use_cases::report::{Outcome, RecordOutcome, Report},
+    use_cases::{
+        dns_gateway::DnsGatewayError,
+        report::{Outcome, RecordOutcome, Report},
+    },
 };
 
 const APEX: &str = "@";
@@ -27,8 +30,27 @@ fn describe(outcome: &Outcome) -> String {
         Outcome::Unchanged => "unchanged".to_owned(),
         Outcome::Drifted { addresses } => format!("drifted (now {})", list(addresses)),
         Outcome::Pointed { previous } => format!("pointed (was {})", list(previous)),
-        _ => String::new(),
+        Outcome::Failed(error) => format!("failed, {}", explain(error)),
     }
+}
+
+fn explain(error: &DnsGatewayError) -> String {
+    let (explanation, detail) = match error {
+        DnsGatewayError::Unavailable(detail) => ("the DNS provider is unavailable", detail),
+        DnsGatewayError::InvalidAnswer(detail) => {
+            ("the DNS provider gave an unexpected answer", detail)
+        }
+        DnsGatewayError::Unauthorized(detail) => ("the DNS provider refused the API token", detail),
+        DnsGatewayError::DomainNotFound(detail) => {
+            ("the domain is not in this DNS provider account", detail)
+        }
+        DnsGatewayError::Rejected(detail) => ("the DNS provider rejected the change", detail),
+        DnsGatewayError::RateLimited(detail) => (
+            "too many requests to the DNS provider, try again later",
+            detail,
+        ),
+    };
+    format!("{explanation} ({detail})")
 }
 
 fn list(addresses: &[Ipv4Addr]) -> String {
@@ -55,7 +77,10 @@ mod test {
             domain_name::DomainName, public_ip::PublicIp, record_name::RecordName,
             tracked_record::TrackedRecord, ttl::Ttl,
         },
-        use_cases::report::{Outcome, RecordOutcome, Report},
+        use_cases::{
+            dns_gateway::DnsGatewayError,
+            report::{Outcome, RecordOutcome, Report},
+        },
     };
 
     use crate::report_view::render;
@@ -124,5 +149,43 @@ mod test {
             "home.example.com: pointed (was 1.1.1.1)",
             record_line(&report_with("home", Outcome::Pointed { previous }))
         );
+    }
+
+    #[test]
+    fn should_explain_why_a_record_failed() {
+        let detail = || "detail".to_owned();
+        let explanations = [
+            (
+                DnsGatewayError::Unavailable(detail()),
+                "the DNS provider is unavailable",
+            ),
+            (
+                DnsGatewayError::InvalidAnswer(detail()),
+                "the DNS provider gave an unexpected answer",
+            ),
+            (
+                DnsGatewayError::Unauthorized(detail()),
+                "the DNS provider refused the API token",
+            ),
+            (
+                DnsGatewayError::DomainNotFound(detail()),
+                "the domain is not in this DNS provider account",
+            ),
+            (
+                DnsGatewayError::Rejected(detail()),
+                "the DNS provider rejected the change",
+            ),
+            (
+                DnsGatewayError::RateLimited(detail()),
+                "too many requests to the DNS provider, try again later",
+            ),
+        ];
+
+        for (error, explanation) in explanations {
+            assert_eq!(
+                format!("home.example.com: failed, {explanation} (detail)"),
+                record_line(&report_with("home", Outcome::Failed(error)))
+            );
+        }
     }
 }
