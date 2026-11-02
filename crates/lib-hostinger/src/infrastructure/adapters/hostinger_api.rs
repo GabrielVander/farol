@@ -14,6 +14,7 @@ pub trait HostingerApi {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum HostingerApiError {
     Unreachable(String),
+    InvalidBody(String),
     Status {
         status: u16,
         message: String,

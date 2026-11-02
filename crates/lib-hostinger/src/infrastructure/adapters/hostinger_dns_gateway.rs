@@ -106,6 +106,7 @@ fn record_set_pointing(record: &TrackedRecord, public_ip: PublicIp) -> RecordSet
 fn translate_error(error: HostingerApiError) -> DnsGatewayError {
     match error {
         HostingerApiError::Unreachable(reason) => DnsGatewayError::Unavailable(reason),
+        HostingerApiError::InvalidBody(reason) => DnsGatewayError::InvalidAnswer(reason),
         HostingerApiError::Status {
             status,
             message,
@@ -421,6 +422,16 @@ mod test {
         assert_eq!(
             DnsGatewayError::Unauthorized("Unauthenticated. (correlation id 26a91bd9)".to_owned()),
             reading_error(error)
+        );
+    }
+
+    #[test]
+    fn should_report_an_invalid_body_as_an_invalid_answer() {
+        assert_eq!(
+            DnsGatewayError::InvalidAnswer("missing field `name`".to_owned()),
+            reading_error(HostingerApiError::InvalidBody(
+                "missing field `name`".to_owned()
+            ))
         );
     }
 }

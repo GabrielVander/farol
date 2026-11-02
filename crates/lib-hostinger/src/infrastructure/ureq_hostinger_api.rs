@@ -48,7 +48,8 @@ impl HostingerApi for UreqHostingerApi {
             .call()
             .map_err(unreachable)?;
         let body = successful_body(response)?;
-        serde_json::from_str(&body).map_err(unreachable)
+        serde_json::from_str(&body)
+            .map_err(|error| HostingerApiError::InvalidBody(error.to_string()))
     }
 
     fn update_zone(
@@ -225,5 +226,14 @@ mod test {
             correlation_id: None,
         };
         assert_eq!(Err(expected), zone);
+    }
+
+    #[test]
+    fn should_report_a_body_that_is_not_a_zone_as_invalid() {
+        let (base_url, _server) = serve_once("200 OK", r#"{"unexpected":true}"#);
+
+        let zone = UreqHostingerApi::new(base_url, TOKEN.to_owned()).zone("example.com");
+
+        assert!(matches!(zone, Err(HostingerApiError::InvalidBody(_))));
     }
 }
