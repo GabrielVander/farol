@@ -35,22 +35,29 @@ fn describe(outcome: &Outcome) -> String {
 }
 
 fn explain(error: &DnsGatewayError) -> String {
-    let (explanation, detail) = match error {
-        DnsGatewayError::Unavailable(detail) => ("the DNS provider is unavailable", detail),
-        DnsGatewayError::InvalidAnswer(detail) => {
-            ("the DNS provider gave an unexpected answer", detail)
-        }
-        DnsGatewayError::Unauthorized(detail) => ("the DNS provider refused the API token", detail),
-        DnsGatewayError::DomainNotFound(detail) => {
-            ("the domain is not in this DNS provider account", detail)
-        }
-        DnsGatewayError::Rejected(detail) => ("the DNS provider rejected the change", detail),
-        DnsGatewayError::RateLimited(detail) => (
-            "too many requests to the DNS provider, try again later",
-            detail,
-        ),
-    };
-    format!("{explanation} ({detail})")
+    format!("{} ({})", explanation(error), detail(error))
+}
+
+fn explanation(error: &DnsGatewayError) -> &'static str {
+    match error {
+        DnsGatewayError::Unavailable(_) => "the DNS provider is unavailable",
+        DnsGatewayError::InvalidAnswer(_) => "the DNS provider gave an unexpected answer",
+        DnsGatewayError::Unauthorized(_) => "the DNS provider refused the API token",
+        DnsGatewayError::DomainNotFound(_) => "the domain is not in this DNS provider account",
+        DnsGatewayError::Rejected(_) => "the DNS provider rejected the change",
+        DnsGatewayError::RateLimited(_) => "too many requests to the DNS provider, try again later",
+    }
+}
+
+fn detail(error: &DnsGatewayError) -> &str {
+    match error {
+        DnsGatewayError::Unavailable(detail)
+        | DnsGatewayError::InvalidAnswer(detail)
+        | DnsGatewayError::Unauthorized(detail)
+        | DnsGatewayError::DomainNotFound(detail)
+        | DnsGatewayError::Rejected(detail)
+        | DnsGatewayError::RateLimited(detail) => detail,
+    }
 }
 
 fn list(addresses: &[Ipv4Addr]) -> String {
