@@ -26,7 +26,7 @@ impl<A: IpifyApi> PublicIpGateway for IpifyPublicIpGateway<A> {
         let address: Ipv4Addr = answer
             .trim()
             .parse()
-            .map_err(|_| PublicIpGatewayError::Unavailable(answer.clone()))?;
+            .map_err(|_| PublicIpGatewayError::InvalidAnswer(answer.clone()))?;
         PublicIp::try_from(address)
             .map_err(|error| PublicIpGatewayError::Unavailable(format!("{error:?}")))
     }
@@ -36,7 +36,7 @@ impl<A: IpifyApi> PublicIpGateway for IpifyPublicIpGateway<A> {
 mod test {
     use std::net::Ipv4Addr;
 
-    use lib_core::use_cases::public_ip_gateway::PublicIpGateway;
+    use lib_core::use_cases::public_ip_gateway::{PublicIpGateway, PublicIpGatewayError};
 
     use crate::infrastructure::adapters::{
         ipify_api::{IpifyApi, IpifyApiError},
@@ -71,5 +71,15 @@ mod test {
             .expect("public ip");
 
         assert_eq!(Ipv4Addr::new(8, 8, 8, 8), public_ip.address());
+    }
+
+    #[test]
+    fn should_report_an_answer_that_is_not_an_address_as_invalid() {
+        let result = gateway_answering("<html>").current_public_ip();
+
+        assert_eq!(
+            Err(PublicIpGatewayError::InvalidAnswer("<html>".to_owned())),
+            result
+        );
     }
 }
