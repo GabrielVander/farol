@@ -19,19 +19,25 @@ impl<A: IpifyApi> IpifyPublicIpGateway<A> {
 
 impl<A: IpifyApi> PublicIpGateway for IpifyPublicIpGateway<A> {
     fn current_public_ip(&self) -> Result<PublicIp, PublicIpGatewayError> {
-        let answer = self
-            .api
-            .fetch_answer()
-            .map_err(|IpifyApiError::Unreachable(reason)| {
-                PublicIpGatewayError::Unavailable(reason)
-            })?;
-        let address: Ipv4Addr = answer
-            .trim()
-            .parse()
-            .map_err(|_| PublicIpGatewayError::InvalidAnswer(answer.clone()))?;
-        PublicIp::try_from(address)
-            .map_err(|PublicIpError::NotPublic(address)| PublicIpGatewayError::NotPublic(address))
+        let answer = self.api.fetch_answer().map_err(unavailable)?;
+        let address = parse_address(&answer)?;
+        PublicIp::try_from(address).map_err(not_public)
     }
+}
+
+fn parse_address(answer: &str) -> Result<Ipv4Addr, PublicIpGatewayError> {
+    answer
+        .trim()
+        .parse()
+        .map_err(|_| PublicIpGatewayError::InvalidAnswer(answer.to_owned()))
+}
+
+fn unavailable(IpifyApiError::Unreachable(reason): IpifyApiError) -> PublicIpGatewayError {
+    PublicIpGatewayError::Unavailable(reason)
+}
+
+fn not_public(PublicIpError::NotPublic(address): PublicIpError) -> PublicIpGatewayError {
+    PublicIpGatewayError::NotPublic(address)
 }
 
 #[cfg(test)]
