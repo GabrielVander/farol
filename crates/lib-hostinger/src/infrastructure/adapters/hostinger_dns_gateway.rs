@@ -198,4 +198,15 @@ mod test {
 
         assert_eq!(vec![Ipv4Addr::new(8, 8, 8, 8)], addresses);
     }
+
+    #[test]
+    fn should_find_no_addresses_for_a_record_missing_from_the_zone() {
+        let api = FakeHostingerApi::default()
+            .with_zone("example.com", vec![record_set("lab", "A", &["8.8.8.8"])]);
+        let gateway = HostingerDnsGateway::new(api);
+
+        let addresses = gateway.addresses_of(&tracked("home")).expect("addresses");
+
+        assert!(addresses.is_empty());
+    }
 }
