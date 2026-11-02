@@ -5,7 +5,7 @@ use lib_core::{
     use_cases::public_ip_gateway::{PublicIpGateway, PublicIpGatewayError},
 };
 
-use crate::infrastructure::adapters::ipify_api::IpifyApi;
+use crate::infrastructure::adapters::ipify_api::{IpifyApi, IpifyApiError};
 
 pub struct IpifyPublicIpGateway<A: IpifyApi> {
     api: A,
@@ -22,7 +22,9 @@ impl<A: IpifyApi> PublicIpGateway for IpifyPublicIpGateway<A> {
         let answer = self
             .api
             .fetch_answer()
-            .map_err(|error| PublicIpGatewayError::Unavailable(format!("{error:?}")))?;
+            .map_err(|IpifyApiError::Unreachable(reason)| {
+                PublicIpGatewayError::Unavailable(reason)
+            })?;
         let address: Ipv4Addr = answer
             .trim()
             .parse()
@@ -92,6 +94,19 @@ mod test {
                 192, 168, 1, 10
             ))),
             result
+        );
+    }
+
+    #[test]
+    fn should_report_an_unreachable_ipify_as_unavailable() {
+        let unreachable = IpifyApiError::Unreachable("connection refused".to_owned());
+        let gateway = IpifyPublicIpGateway::new(FakeIpifyApi(Err(unreachable)));
+
+        assert_eq!(
+            Err(PublicIpGatewayError::Unavailable(
+                "connection refused".to_owned()
+            )),
+            gateway.current_public_ip()
         );
     }
 }
