@@ -12,6 +12,7 @@ pub enum DomainNameError {
     Empty,
     TooLong,
     LabelTooLong,
+    InvalidCharacter(char),
 }
 
 impl TryFrom<&str> for DomainName {
@@ -41,7 +42,14 @@ fn validate_label(label: &str) -> Result<(), DomainNameError> {
     if label.len() > MAX_LABEL_LENGTH {
         return Err(DomainNameError::LabelTooLong);
     }
-    Ok(())
+    match label.chars().find(|c| !is_label_character(*c)) {
+        Some(invalid) => Err(DomainNameError::InvalidCharacter(invalid)),
+        None => Ok(()),
+    }
+}
+
+fn is_label_character(character: char) -> bool {
+    character.is_ascii_alphanumeric() || character == '-'
 }
 
 #[cfg(test)]
@@ -78,6 +86,14 @@ mod test {
         assert_eq!(
             Err(DomainNameError::TooLong),
             DomainName::try_from(domain.as_str())
+        );
+    }
+
+    #[test]
+    fn should_reject_invalid_characters() {
+        assert_eq!(
+            Err(DomainNameError::InvalidCharacter('_')),
+            DomainName::try_from("exa_mple.com")
         );
     }
 }
