@@ -116,6 +116,11 @@ fn translate_error(error: HostingerApiError) -> DnsGatewayError {
             message,
             ..
         } => DnsGatewayError::DomainNotFound(message),
+        HostingerApiError::Status {
+            status: 422,
+            message,
+            ..
+        } => DnsGatewayError::Rejected(message),
         HostingerApiError::Status { message, .. } => DnsGatewayError::Unavailable(message),
     }
 }
@@ -146,6 +151,7 @@ mod test {
         updates: Mutex<Vec<(String, UpdateZoneRequest)>>,
         zone_reads: Mutex<usize>,
         zone_failure: Option<HostingerApiError>,
+        update_failure: Option<HostingerApiError>,
     }
 
     impl FakeHostingerApi {
@@ -184,6 +190,9 @@ mod test {
             domain: &str,
             request: &UpdateZoneRequest,
         ) -> Result<(), HostingerApiError> {
+            if let Some(error) = &self.update_failure {
+                return Err(error.clone());
+            }
             let mut updates = self.updates.lock().expect("unpoisoned");
             updates.push((domain.to_owned(), request.clone()));
             Ok(())
@@ -353,6 +362,23 @@ mod test {
         assert_eq!(
             DnsGatewayError::DomainNotFound("Not found.".to_owned()),
             reading_error(status(404, "Not found."))
+        );
+    }
+
+    #[test]
+    fn should_report_422_as_rejected() {
+        let api = FakeHostingerApi {
+            update_failure: Some(status(422, "The ttl must be at least 60.")),
+            ..FakeHostingerApi::default()
+        };
+        let gateway = HostingerDnsGateway::new(api);
+        let public_ip = PublicIp::try_from(Ipv4Addr::new(8, 8, 8, 8)).expect("public ip");
+
+        assert_eq!(
+            Err(DnsGatewayError::Rejected(
+                "The ttl must be at least 60.".to_owned()
+            )),
+            gateway.point(&tracked("home"), public_ip)
         );
     }
 }
