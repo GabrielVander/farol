@@ -24,6 +24,7 @@ impl<A: IpifyApi> PublicIpGateway for IpifyPublicIpGateway<A> {
             .fetch_answer()
             .map_err(|error| PublicIpGatewayError::Unavailable(format!("{error:?}")))?;
         let address: Ipv4Addr = answer
+            .trim()
             .parse()
             .map_err(|_| PublicIpGatewayError::Unavailable(answer.clone()))?;
         PublicIp::try_from(address)
@@ -57,6 +58,15 @@ mod test {
     #[test]
     fn should_read_the_public_ip_from_the_answer() {
         let public_ip = gateway_answering("8.8.8.8")
+            .current_public_ip()
+            .expect("public ip");
+
+        assert_eq!(Ipv4Addr::new(8, 8, 8, 8), public_ip.address());
+    }
+
+    #[test]
+    fn should_ignore_whitespace_around_the_answer() {
+        let public_ip = gateway_answering(" 8.8.8.8\n")
             .current_public_ip()
             .expect("public ip");
 
