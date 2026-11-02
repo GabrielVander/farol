@@ -2,14 +2,11 @@ use std::net::Ipv4Addr;
 use std::sync::Arc;
 
 use crate::{
-    entities::{
-        public_ip::PublicIp,
-        report::{Outcome, RecordOutcome, Report},
-        tracked_record::TrackedRecord,
-    },
+    entities::{public_ip::PublicIp, tracked_record::TrackedRecord},
     use_cases::{
         dns_gateway::DnsGateway,
         public_ip_gateway::{PublicIpGateway, PublicIpGatewayError},
+        report::{Outcome, RecordOutcome, Report},
     },
 };
 
@@ -67,7 +64,7 @@ mod test {
     use std::sync::Arc;
 
     use crate::{
-        entities::report::{Outcome, RecordOutcome},
+        use_cases::report::{Outcome, RecordOutcome},
         use_cases::{
             check_records::{CheckRecords, CheckRecordsUseCase},
             dns_gateway::DnsGatewayError,
