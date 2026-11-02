@@ -23,7 +23,7 @@ impl TryFrom<&str> for DomainName {
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         validate_length(value)?;
         value.split('.').try_for_each(validate_label)?;
-        Ok(Self(value.to_owned()))
+        Ok(Self(value.to_ascii_lowercase()))
     }
 }
 
@@ -141,5 +141,12 @@ mod test {
             Err(DomainNameError::HyphenAtLabelEdge),
             DomainName::try_from("example-.com")
         );
+    }
+
+    #[test]
+    fn should_lowercase_the_domain() {
+        let domain = DomainName::try_from("Example.COM").expect("valid domain");
+
+        assert_eq!("example.com", domain.as_str());
     }
 }
