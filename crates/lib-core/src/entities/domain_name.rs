@@ -14,6 +14,7 @@ pub enum DomainNameError {
     EmptyLabel,
     LabelTooLong,
     InvalidCharacter(char),
+    HyphenAtLabelEdge,
 }
 
 impl TryFrom<&str> for DomainName {
@@ -41,7 +42,8 @@ fn validate_length(domain: &str) -> Result<(), DomainNameError> {
 
 fn validate_label(label: &str) -> Result<(), DomainNameError> {
     validate_label_length(label)?;
-    validate_label_characters(label)
+    validate_label_characters(label)?;
+    validate_label_edges(label)
 }
 
 fn validate_label_length(label: &str) -> Result<(), DomainNameError> {
@@ -59,6 +61,13 @@ fn validate_label_characters(label: &str) -> Result<(), DomainNameError> {
         Some(invalid) => Err(DomainNameError::InvalidCharacter(invalid)),
         None => Ok(()),
     }
+}
+
+fn validate_label_edges(label: &str) -> Result<(), DomainNameError> {
+    if label.starts_with('-') || label.ends_with('-') {
+        return Err(DomainNameError::HyphenAtLabelEdge);
+    }
+    Ok(())
 }
 
 fn is_label_character(character: char) -> bool {
@@ -115,6 +124,22 @@ mod test {
         assert_eq!(
             Err(DomainNameError::EmptyLabel),
             DomainName::try_from("example..com")
+        );
+    }
+
+    #[test]
+    fn should_reject_a_label_starting_with_a_hyphen() {
+        assert_eq!(
+            Err(DomainNameError::HyphenAtLabelEdge),
+            DomainName::try_from("-example.com")
+        );
+    }
+
+    #[test]
+    fn should_reject_a_label_ending_with_a_hyphen() {
+        assert_eq!(
+            Err(DomainNameError::HyphenAtLabelEdge),
+            DomainName::try_from("example-.com")
         );
     }
 }
