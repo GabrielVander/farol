@@ -4,6 +4,7 @@ use lib_core::{
     entities::tracked_record::TrackedRecord,
     use_cases::{
         dns_gateway::DnsGatewayError,
+        public_ip_gateway::PublicIpGatewayError,
         report::{Outcome, RecordOutcome, Report},
     },
 };
@@ -26,6 +27,22 @@ pub fn has_failures(report: &Report) -> bool {
         .records
         .iter()
         .any(|record_outcome| matches!(record_outcome.outcome, Outcome::Failed(_)))
+}
+
+/// Why no record could be checked: the public IP is unknown.
+pub fn explain_public_ip_error(error: &PublicIpGatewayError) -> String {
+    let reason = match error {
+        PublicIpGatewayError::Unavailable(detail) => {
+            format!("the public IP service is unavailable ({detail})")
+        }
+        PublicIpGatewayError::InvalidAnswer(detail) => {
+            format!("the public IP service gave an unexpected answer ({detail})")
+        }
+        PublicIpGatewayError::NotPublic(address) => {
+            format!("the public IP service answered {address}, which is not a public address")
+        }
+    };
+    format!("could not find the public IP: {reason}")
 }
 
 fn record_line(record_outcome: &RecordOutcome) -> String {
@@ -94,11 +111,12 @@ mod test {
         },
         use_cases::{
             dns_gateway::DnsGatewayError,
+            public_ip_gateway::PublicIpGatewayError,
             report::{Outcome, RecordOutcome, Report},
         },
     };
 
-    use crate::report_view::{has_failures, render};
+    use crate::report_view::{explain_public_ip_error, has_failures, render};
 
     fn public_ip() -> PublicIp {
         PublicIp::try_from(Ipv4Addr::new(8, 8, 8, 8)).expect("public ip")
@@ -221,5 +239,27 @@ mod test {
         report.records.extend(failed.records);
 
         assert!(has_failures(&report));
+    }
+
+    #[test]
+    fn should_explain_why_the_public_ip_is_unknown() {
+        let explanations = [
+            (
+                PublicIpGatewayError::Unavailable("timeout".to_owned()),
+                "could not find the public IP: the public IP service is unavailable (timeout)",
+            ),
+            (
+                PublicIpGatewayError::InvalidAnswer("<html>".to_owned()),
+                "could not find the public IP: the public IP service gave an unexpected answer (<html>)",
+            ),
+            (
+                PublicIpGatewayError::NotPublic(Ipv4Addr::new(10, 0, 0, 1)),
+                "could not find the public IP: the public IP service answered 10.0.0.1, which is not a public address",
+            ),
+        ];
+
+        for (error, explanation) in explanations {
+            assert_eq!(explanation, explain_public_ip_error(&error));
+        }
     }
 }
