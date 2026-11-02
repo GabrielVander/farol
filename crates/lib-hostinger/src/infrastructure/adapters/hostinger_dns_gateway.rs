@@ -30,6 +30,7 @@ impl<A: HostingerApi> DnsGateway for HostingerDnsGateway<A> {
             .filter(|record_set| record_set.kind == ADDRESS_RECORD)
             .filter(|record_set| record_set.name == record.name.as_str())
             .flat_map(|record_set| &record_set.records)
+            .filter(|value| !value.is_disabled)
             .filter_map(|value| value.content.parse().ok())
             .collect())
     }
@@ -179,6 +180,18 @@ mod test {
                 record_set("home", "A", &["8.8.8.8"]),
             ],
         );
+        let gateway = HostingerDnsGateway::new(api);
+
+        let addresses = gateway.addresses_of(&tracked("home")).expect("addresses");
+
+        assert_eq!(vec![Ipv4Addr::new(8, 8, 8, 8)], addresses);
+    }
+
+    #[test]
+    fn should_ignore_disabled_records() {
+        let mut home = record_set("home", "A", &["1.1.1.1", "8.8.8.8"]);
+        home.records[0].is_disabled = true;
+        let api = FakeHostingerApi::default().with_zone("example.com", vec![home]);
         let gateway = HostingerDnsGateway::new(api);
 
         let addresses = gateway.addresses_of(&tracked("home")).expect("addresses");
