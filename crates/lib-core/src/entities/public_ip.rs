@@ -34,6 +34,13 @@ fn is_reserved(address: Ipv4Addr) -> bool {
         || address.is_broadcast()
         || address.is_multicast()
         || address.is_documentation()
+        || is_carrier_grade_nat(address)
+}
+
+// 100.64.0.0/10 (RFC 6598). Ipv4Addr::is_shared does this but is unstable.
+fn is_carrier_grade_nat(address: Ipv4Addr) -> bool {
+    let [first, second, ..] = address.octets();
+    first == 100 && (second & 0b1100_0000) == 0b0100_0000
 }
 
 #[cfg(test)]
@@ -78,6 +85,26 @@ mod test {
                 PublicIp::try_from(address),
                 "{address} should not be public"
             );
+        }
+    }
+
+    #[test]
+    fn should_reject_a_carrier_grade_nat_address() {
+        let address = Ipv4Addr::new(100, 100, 1, 1);
+
+        assert_eq!(
+            Err(PublicIpError::NotPublic(address)),
+            PublicIp::try_from(address)
+        );
+    }
+
+    #[test]
+    fn should_accept_addresses_just_outside_carrier_grade_nat() {
+        for address in [
+            Ipv4Addr::new(100, 63, 255, 255),
+            Ipv4Addr::new(100, 128, 0, 0),
+        ] {
+            assert!(PublicIp::try_from(address).is_ok(), "{address} is public");
         }
     }
 }
