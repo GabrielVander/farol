@@ -236,4 +236,16 @@ mod test {
 
         assert!(matches!(zone, Err(HostingerApiError::InvalidBody(_))));
     }
+
+    #[test]
+    fn should_report_a_refused_connection_as_unreachable() {
+        let closed_port = TcpListener::bind("127.0.0.1:0")
+            .and_then(|listener| listener.local_addr())
+            .expect("address");
+
+        let zone = UreqHostingerApi::new(format!("http://{closed_port}"), TOKEN.to_owned())
+            .zone("example.com");
+
+        assert!(matches!(zone, Err(HostingerApiError::Unreachable(_))));
+    }
 }
