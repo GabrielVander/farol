@@ -111,6 +111,11 @@ fn translate_error(error: HostingerApiError) -> DnsGatewayError {
             message,
             ..
         } => DnsGatewayError::Unauthorized(message),
+        HostingerApiError::Status {
+            status: 404,
+            message,
+            ..
+        } => DnsGatewayError::DomainNotFound(message),
         HostingerApiError::Status { message, .. } => DnsGatewayError::Unavailable(message),
     }
 }
@@ -340,6 +345,14 @@ mod test {
         assert_eq!(
             DnsGatewayError::Unauthorized("Unauthenticated.".to_owned()),
             reading_error(status(401, "Unauthenticated."))
+        );
+    }
+
+    #[test]
+    fn should_report_404_as_domain_not_found() {
+        assert_eq!(
+            DnsGatewayError::DomainNotFound("Not found.".to_owned()),
+            reading_error(status(404, "Not found."))
         );
     }
 }
