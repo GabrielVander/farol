@@ -27,6 +27,8 @@ impl<A: HostingerApi> DnsGateway for HostingerDnsGateway<A> {
         )?;
         Ok(record_sets
             .iter()
+            .filter(|record_set| record_set.kind == ADDRESS_RECORD)
+            .filter(|record_set| record_set.name == record.name.as_str())
             .flat_map(|record_set| &record_set.records)
             .filter_map(|value| value.content.parse().ok())
             .collect())
@@ -164,5 +166,23 @@ mod test {
             vec![("example.com".to_owned(), expected)],
             gateway.api.updates()
         );
+    }
+
+    #[test]
+    fn should_ignore_other_types_and_names() {
+        let api = FakeHostingerApi::default().with_zone(
+            "example.com",
+            vec![
+                record_set("home", "AAAA", &["2001:db8::1"]),
+                record_set("lab", "A", &["1.1.1.1"]),
+                record_set("home", "TXT", &["9.9.9.9"]),
+                record_set("home", "A", &["8.8.8.8"]),
+            ],
+        );
+        let gateway = HostingerDnsGateway::new(api);
+
+        let addresses = gateway.addresses_of(&tracked("home")).expect("addresses");
+
+        assert_eq!(vec![Ipv4Addr::new(8, 8, 8, 8)], addresses);
     }
 }
