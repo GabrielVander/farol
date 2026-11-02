@@ -96,4 +96,34 @@ mod test {
             assert_eq!(explanation, explain_config_error(&error));
         }
     }
+
+    #[test]
+    fn should_explain_each_domain_problem() {
+        let explanations = [
+            (DomainNameError::TooLong, "it is longer than 253 characters"),
+            (
+                DomainNameError::Label(LabelError::Empty),
+                "it has an empty label",
+            ),
+            (
+                DomainNameError::Label(LabelError::TooLong),
+                "a label is longer than 63 characters",
+            ),
+            (
+                DomainNameError::Label(LabelError::InvalidCharacter('_')),
+                "it contains '_'",
+            ),
+        ];
+
+        for (reason, problem) in explanations {
+            let error = ConfigError::InvalidDomain {
+                domain: "x".to_owned(),
+                reason,
+            };
+            assert_eq!(
+                format!("invalid domain \"x\": {problem}"),
+                explain_config_error(&error)
+            );
+        }
+    }
 }
