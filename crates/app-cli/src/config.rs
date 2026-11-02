@@ -2,6 +2,7 @@ use std::fmt::Debug;
 
 use lib_core::entities::{
     domain_name::{DomainName, DomainNameError},
+    label::LabelError,
     record_name::RecordName,
     tracked_record::TrackedRecord,
     ttl::Ttl,
@@ -36,6 +37,10 @@ pub enum ConfigError {
     InvalidDomain {
         domain: String,
         reason: DomainNameError,
+    },
+    InvalidRecordName {
+        name: String,
+        reason: LabelError,
     },
     Invalid(String),
 }
@@ -78,7 +83,12 @@ impl RawRecord {
                     reason,
                 }
             })?,
-            name: RecordName::try_from(self.name.as_str()).map_err(invalid)?,
+            name: RecordName::try_from(self.name.as_str()).map_err(|reason| {
+                ConfigError::InvalidRecordName {
+                    name: self.name.clone(),
+                    reason,
+                }
+            })?,
             ttl: Ttl::try_from(self.ttl).map_err(invalid)?,
         })
     }
@@ -172,6 +182,17 @@ mod test {
         let expected = ConfigError::InvalidDomain {
             domain: "exa_mple.com".to_owned(),
             reason: DomainNameError::Label(LabelError::InvalidCharacter('_')),
+        };
+        assert_eq!(Err(expected), Config::parse(&text));
+    }
+
+    #[test]
+    fn should_reject_an_invalid_record_name_and_name_it() {
+        let text = single_record("example.com", "-home", 300);
+
+        let expected = ConfigError::InvalidRecordName {
+            name: "-home".to_owned(),
+            reason: LabelError::HyphenAtEdge,
         };
         assert_eq!(Err(expected), Config::parse(&text));
     }
