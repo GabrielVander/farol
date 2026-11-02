@@ -7,7 +7,9 @@ pub struct MissingToken;
 pub fn hostinger_token(
     environment: impl Fn(&str) -> Option<String>,
 ) -> Result<String, MissingToken> {
-    environment(HOSTINGER_TOKEN_VARIABLE).ok_or(MissingToken)
+    environment(HOSTINGER_TOKEN_VARIABLE)
+        .filter(|token| !token.trim().is_empty())
+        .ok_or(MissingToken)
 }
 
 #[cfg(test)]
@@ -24,5 +26,13 @@ mod test {
     #[test]
     fn should_report_a_missing_token() {
         assert_eq!(Err(MissingToken), hostinger_token(|_| None));
+    }
+
+    #[test]
+    fn should_treat_a_blank_token_as_missing() {
+        assert_eq!(
+            Err(MissingToken),
+            hostinger_token(|_| Some("  ".to_owned()))
+        );
     }
 }
