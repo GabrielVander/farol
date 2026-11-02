@@ -68,6 +68,7 @@ mod test {
         use_cases::{
             check_records::{CheckRecords, CheckRecordsUseCase},
             dns_gateway::DnsGatewayError,
+            public_ip_gateway::PublicIpGatewayError,
             test_support::{
                 FakeDnsGateway, FakePublicIpGateway, OLD_ADDRESS, PUBLIC_ADDRESS, public_ip,
                 tracked,
@@ -173,5 +174,16 @@ mod test {
             },
         ];
         assert_eq!(expected, report.records);
+    }
+
+    #[test]
+    fn should_stop_when_the_public_ip_is_unavailable() {
+        let error = PublicIpGatewayError::Unavailable("offline".to_owned());
+        let check = CheckRecords::new(
+            Arc::new(FakePublicIpGateway(Err(error.clone()))),
+            Arc::new(FakeDnsGateway::default()),
+        );
+
+        assert_eq!(Err(error), check.execute(&[tracked("home")]));
     }
 }
