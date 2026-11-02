@@ -83,4 +83,16 @@ mod test {
 
         assert!(matches!(answer, Err(IpifyApiError::Unreachable(_))));
     }
+
+    #[test]
+    fn should_report_a_refused_connection_as_unreachable() {
+        let closed_port = TcpListener::bind("127.0.0.1:0")
+            .and_then(|listener| listener.local_addr())
+            .expect("address");
+        let url = format!("http://{closed_port}/");
+
+        let answer = UreqIpifyApi::new(url, TIMEOUT).fetch_answer();
+
+        assert!(matches!(answer, Err(IpifyApiError::Unreachable(_))));
+    }
 }
