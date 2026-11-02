@@ -1,5 +1,3 @@
-use std::fmt::Debug;
-
 use lib_core::entities::{
     domain_name::{DomainName, DomainNameError},
     label::LabelError,
@@ -47,7 +45,6 @@ pub enum ConfigError {
         name: String,
         reason: TtlError,
     },
-    Invalid(String),
 }
 
 impl Config {
@@ -82,29 +79,33 @@ struct RawRecord {
 impl RawRecord {
     fn to_tracked(&self) -> Result<TrackedRecord, ConfigError> {
         Ok(TrackedRecord {
-            domain: DomainName::try_from(self.domain.as_str()).map_err(|reason| {
-                ConfigError::InvalidDomain {
-                    domain: self.domain.clone(),
-                    reason,
-                }
-            })?,
-            name: RecordName::try_from(self.name.as_str()).map_err(|reason| {
-                ConfigError::InvalidRecordName {
-                    name: self.name.clone(),
-                    reason,
-                }
-            })?,
-            ttl: Ttl::try_from(self.ttl).map_err(|reason| ConfigError::InvalidTtl {
-                domain: self.domain.clone(),
-                name: self.name.clone(),
-                reason,
-            })?,
+            domain: self.domain()?,
+            name: self.name()?,
+            ttl: self.ttl()?,
         })
     }
-}
 
-fn invalid(error: impl Debug) -> ConfigError {
-    ConfigError::Invalid(format!("{error:?}"))
+    fn domain(&self) -> Result<DomainName, ConfigError> {
+        DomainName::try_from(self.domain.as_str()).map_err(|reason| ConfigError::InvalidDomain {
+            domain: self.domain.clone(),
+            reason,
+        })
+    }
+
+    fn name(&self) -> Result<RecordName, ConfigError> {
+        RecordName::try_from(self.name.as_str()).map_err(|reason| ConfigError::InvalidRecordName {
+            name: self.name.clone(),
+            reason,
+        })
+    }
+
+    fn ttl(&self) -> Result<Ttl, ConfigError> {
+        Ttl::try_from(self.ttl).map_err(|reason| ConfigError::InvalidTtl {
+            domain: self.domain.clone(),
+            name: self.name.clone(),
+            reason,
+        })
+    }
 }
 
 #[cfg(test)]
