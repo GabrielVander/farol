@@ -7,4 +7,5 @@ pub trait PublicIpGateway {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PublicIpGatewayError {
     Unavailable(String),
+    InvalidAnswer(String),
 }
