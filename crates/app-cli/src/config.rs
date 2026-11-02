@@ -19,12 +19,14 @@ pub enum Provider {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ConfigError {
+    InvalidToml(String),
     Invalid(String),
 }
 
 impl Config {
     pub fn parse(text: &str) -> Result<Self, ConfigError> {
-        let raw: RawConfig = toml::from_str(text).map_err(invalid)?;
+        let raw: RawConfig =
+            toml::from_str(text).map_err(|error| ConfigError::InvalidToml(error.to_string()))?;
         let records = raw
             .records
             .iter()
@@ -69,7 +71,7 @@ mod test {
         domain_name::DomainName, record_name::RecordName, tracked_record::TrackedRecord, ttl::Ttl,
     };
 
-    use crate::config::{Config, Provider};
+    use crate::config::{Config, ConfigError, Provider};
 
     fn tracked(domain: &str, name: &str, ttl: u32) -> TrackedRecord {
         TrackedRecord {
@@ -103,5 +105,13 @@ mod test {
             ],
         };
         assert_eq!(Ok(expected), Config::parse(text));
+    }
+
+    #[test]
+    fn should_report_toml_that_does_not_parse() {
+        assert!(matches!(
+            Config::parse("provider = "),
+            Err(ConfigError::InvalidToml(_))
+        ));
     }
 }
