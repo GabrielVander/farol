@@ -1,4 +1,4 @@
-use std::{collections::HashMap, net::Ipv4Addr};
+use std::{collections::HashMap, net::Ipv4Addr, sync::Mutex};
 
 use crate::{
     entities::{
@@ -37,6 +37,7 @@ impl PublicIpGateway for FakePublicIpGateway {
 #[derive(Default)]
 pub(crate) struct FakeDnsGateway {
     addresses: HashMap<String, Result<Vec<Ipv4Addr>, DnsGatewayError>>,
+    pointed: Mutex<Vec<(TrackedRecord, PublicIp)>>,
 }
 
 impl FakeDnsGateway {
@@ -50,11 +51,21 @@ impl FakeDnsGateway {
         self.addresses.insert(name.to_owned(), Err(error));
         self
     }
+
+    pub(crate) fn pointed(&self) -> Vec<(TrackedRecord, PublicIp)> {
+        self.pointed.lock().expect("unpoisoned").clone()
+    }
 }
 
 impl DnsGateway for FakeDnsGateway {
     fn addresses_of(&self, record: &TrackedRecord) -> Result<Vec<Ipv4Addr>, DnsGatewayError> {
         let stored = self.addresses.get(record.name.as_str()).cloned();
         stored.unwrap_or(Ok(Vec::new()))
+    }
+
+    fn point(&self, record: &TrackedRecord, public_ip: PublicIp) -> Result<(), DnsGatewayError> {
+        let mut pointed = self.pointed.lock().expect("unpoisoned");
+        pointed.push((record.clone(), public_ip));
+        Ok(())
     }
 }
