@@ -12,4 +12,5 @@ pub trait DnsGateway {
 pub enum DnsGatewayError {
     Unavailable(String),
     InvalidAnswer(String),
+    Unauthorized(String),
 }
