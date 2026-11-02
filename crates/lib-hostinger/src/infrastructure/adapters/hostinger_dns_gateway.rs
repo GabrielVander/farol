@@ -36,6 +36,11 @@ impl<A: HostingerApi> HostingerDnsGateway<A> {
         zones.insert(domain.to_owned(), record_sets.clone());
         Ok(record_sets)
     }
+
+    fn forget_zone(&self, domain: &str) {
+        let mut zones = self.zones.lock().unwrap_or_else(PoisonError::into_inner);
+        zones.remove(domain);
+    }
 }
 
 impl<A: HostingerApi> DnsGateway for HostingerDnsGateway<A> {
@@ -46,6 +51,7 @@ impl<A: HostingerApi> DnsGateway for HostingerDnsGateway<A> {
 
     fn point(&self, record: &TrackedRecord, public_ip: PublicIp) -> Result<(), DnsGatewayError> {
         let request = overwrite_request(record, public_ip);
+        self.forget_zone(record.domain.as_str());
         self.api
             .update_zone(record.domain.as_str(), &request)
             .map_err(translate_error)
@@ -279,5 +285,19 @@ mod test {
         gateway.addresses_of(&tracked("home")).expect("addresses");
 
         assert_eq!(1, gateway.api.zone_reads());
+    }
+
+    #[test]
+    fn should_read_the_zone_again_after_pointing_a_record() {
+        let api = FakeHostingerApi::default()
+            .with_zone("example.com", vec![record_set("home", "A", &["1.1.1.1"])]);
+        let gateway = HostingerDnsGateway::new(api);
+        let public_ip = PublicIp::try_from(Ipv4Addr::new(8, 8, 8, 8)).expect("public ip");
+
+        gateway.addresses_of(&tracked("home")).expect("addresses");
+        gateway.point(&tracked("home"), public_ip).expect("pointed");
+        gateway.addresses_of(&tracked("home")).expect("addresses");
+
+        assert_eq!(2, gateway.api.zone_reads());
     }
 }
