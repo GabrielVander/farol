@@ -22,5 +22,6 @@ pub struct RecordOutcome {
 pub enum Outcome {
     Unchanged,
     Drifted { addresses: Vec<Ipv4Addr> },
+    Pointed { previous: Vec<Ipv4Addr> },
     Failed(DnsGatewayError),
 }
