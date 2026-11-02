@@ -1,6 +1,8 @@
+use std::net::Ipv4Addr;
+
 use lib_core::{
     entities::tracked_record::TrackedRecord,
-    use_cases::report::{RecordOutcome, Report},
+    use_cases::report::{Outcome, RecordOutcome, Report},
 };
 
 const APEX: &str = "@";
@@ -16,7 +18,24 @@ pub fn render(report: &Report) -> String {
 }
 
 fn record_line(record_outcome: &RecordOutcome) -> String {
-    format!("{}: unchanged\n", full_name(&record_outcome.record))
+    let name = full_name(&record_outcome.record);
+    format!("{name}: {}\n", describe(&record_outcome.outcome))
+}
+
+fn describe(outcome: &Outcome) -> String {
+    match outcome {
+        Outcome::Unchanged => "unchanged".to_owned(),
+        Outcome::Drifted { addresses } => format!("drifted (now {})", list(addresses)),
+        _ => String::new(),
+    }
+}
+
+fn list(addresses: &[Ipv4Addr]) -> String {
+    if addresses.is_empty() {
+        return "no A record".to_owned();
+    }
+    let addresses: Vec<String> = addresses.iter().map(Ipv4Addr::to_string).collect();
+    addresses.join(", ")
 }
 
 fn full_name(record: &TrackedRecord) -> String {
@@ -79,6 +98,20 @@ mod test {
         assert_eq!(
             "example.com: unchanged",
             record_line(&report_with("@", Outcome::Unchanged))
+        );
+    }
+
+    #[test]
+    fn should_render_a_drifted_record_with_its_current_addresses() {
+        let addresses = vec![Ipv4Addr::new(1, 1, 1, 1), Ipv4Addr::new(2, 2, 2, 2)];
+
+        assert_eq!(
+            "home.example.com: drifted (now 1.1.1.1, 2.2.2.2)",
+            record_line(&report_with("home", Outcome::Drifted { addresses }))
+        );
+        assert_eq!(
+            "home.example.com: drifted (now no A record)",
+            record_line(&report_with("home", Outcome::Drifted { addresses: vec![] }))
         );
     }
 }
