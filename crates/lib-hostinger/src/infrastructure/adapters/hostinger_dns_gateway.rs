@@ -394,4 +394,18 @@ mod test {
             reading_error(status(429, "Too Many Attempts."))
         );
     }
+
+    #[test]
+    fn should_report_other_failures_as_unavailable() {
+        assert_eq!(
+            DnsGatewayError::Unavailable("Server Error".to_owned()),
+            reading_error(status(500, "Server Error"))
+        );
+        assert_eq!(
+            DnsGatewayError::Unavailable("connection refused".to_owned()),
+            reading_error(HostingerApiError::Unreachable(
+                "connection refused".to_owned()
+            ))
+        );
+    }
 }
