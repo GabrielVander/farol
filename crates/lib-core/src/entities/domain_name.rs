@@ -11,6 +11,7 @@ impl DomainName {
 pub enum DomainNameError {
     Empty,
     TooLong,
+    EmptyLabel,
     LabelTooLong,
     InvalidCharacter(char),
 }
@@ -39,9 +40,21 @@ fn validate_length(domain: &str) -> Result<(), DomainNameError> {
 }
 
 fn validate_label(label: &str) -> Result<(), DomainNameError> {
+    validate_label_length(label)?;
+    validate_label_characters(label)
+}
+
+fn validate_label_length(label: &str) -> Result<(), DomainNameError> {
+    if label.is_empty() {
+        return Err(DomainNameError::EmptyLabel);
+    }
     if label.len() > MAX_LABEL_LENGTH {
         return Err(DomainNameError::LabelTooLong);
     }
+    Ok(())
+}
+
+fn validate_label_characters(label: &str) -> Result<(), DomainNameError> {
     match label.chars().find(|c| !is_label_character(*c)) {
         Some(invalid) => Err(DomainNameError::InvalidCharacter(invalid)),
         None => Ok(()),
@@ -94,6 +107,14 @@ mod test {
         assert_eq!(
             Err(DomainNameError::InvalidCharacter('_')),
             DomainName::try_from("exa_mple.com")
+        );
+    }
+
+    #[test]
+    fn should_reject_an_empty_label() {
+        assert_eq!(
+            Err(DomainNameError::EmptyLabel),
+            DomainName::try_from("example..com")
         );
     }
 }
