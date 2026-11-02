@@ -230,4 +230,11 @@ mod test {
             Config::parse(r#"provider = "hostinger""#)
         );
     }
+
+    #[test]
+    fn should_parse_the_documented_example_config() {
+        let example = include_str!("../../../examples/config.toml");
+
+        assert!(Config::parse(example).is_ok());
+    }
 }

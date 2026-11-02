@@ -1,0 +1,21 @@
+# farol config: $XDG_CONFIG_HOME/farol/config.toml, ~/.config/farol/config.toml,
+# or any path passed with --config.
+#
+# The Hostinger API token is NOT stored here: set FAROL_HOSTINGER_TOKEN.
+
+# The DNS provider that hosts the domains below. Supported: "hostinger".
+provider = "hostinger"
+
+# One [[records]] block per A record to keep pointed at this machine's public IP.
+
+# The apex: example.com itself.
+[[records]]
+domain = "example.com"
+name = "@"
+ttl = 300
+
+# A subdomain: home.example.com.
+[[records]]
+domain = "example.com"
+name = "home"
+ttl = 300
