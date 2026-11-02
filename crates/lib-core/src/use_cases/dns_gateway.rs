@@ -11,4 +11,5 @@ pub trait DnsGateway {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DnsGatewayError {
     Unavailable(String),
+    InvalidAnswer(String),
 }
