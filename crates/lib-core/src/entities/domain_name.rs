@@ -10,6 +10,7 @@ impl DomainName {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DomainNameError {
     Empty,
+    TooLong,
     LabelTooLong,
 }
 
@@ -17,15 +18,24 @@ impl TryFrom<&str> for DomainName {
     type Error = DomainNameError;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
-        if value.is_empty() {
-            return Err(DomainNameError::Empty);
-        }
+        validate_length(value)?;
         value.split('.').try_for_each(validate_label)?;
         Ok(Self(value.to_owned()))
     }
 }
 
+const MAX_DOMAIN_LENGTH: usize = 253;
 const MAX_LABEL_LENGTH: usize = 63;
+
+fn validate_length(domain: &str) -> Result<(), DomainNameError> {
+    if domain.is_empty() {
+        return Err(DomainNameError::Empty);
+    }
+    if domain.len() > MAX_DOMAIN_LENGTH {
+        return Err(DomainNameError::TooLong);
+    }
+    Ok(())
+}
 
 fn validate_label(label: &str) -> Result<(), DomainNameError> {
     if label.len() > MAX_LABEL_LENGTH {
@@ -56,6 +66,17 @@ mod test {
 
         assert_eq!(
             Err(DomainNameError::LabelTooLong),
+            DomainName::try_from(domain.as_str())
+        );
+    }
+
+    #[test]
+    fn should_reject_a_domain_longer_than_253_characters() {
+        let label = "a".repeat(63);
+        let domain = [label.as_str(); 4].join(".");
+
+        assert_eq!(
+            Err(DomainNameError::TooLong),
             DomainName::try_from(domain.as_str())
         );
     }
