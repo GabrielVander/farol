@@ -103,8 +103,16 @@ fn record_set_pointing(record: &TrackedRecord, public_ip: PublicIp) -> RecordSet
     }
 }
 
-fn translate_error(HostingerApiError::Unreachable(reason): HostingerApiError) -> DnsGatewayError {
-    DnsGatewayError::Unavailable(reason)
+fn translate_error(error: HostingerApiError) -> DnsGatewayError {
+    match error {
+        HostingerApiError::Unreachable(reason) => DnsGatewayError::Unavailable(reason),
+        HostingerApiError::Status {
+            status: 401,
+            message,
+            ..
+        } => DnsGatewayError::Unauthorized(message),
+        HostingerApiError::Status { message, .. } => DnsGatewayError::Unavailable(message),
+    }
 }
 
 #[cfg(test)]
@@ -132,12 +140,20 @@ mod test {
         zones: HashMap<String, Vec<RecordSet>>,
         updates: Mutex<Vec<(String, UpdateZoneRequest)>>,
         zone_reads: Mutex<usize>,
+        zone_failure: Option<HostingerApiError>,
     }
 
     impl FakeHostingerApi {
         fn with_zone(mut self, domain: &str, record_sets: Vec<RecordSet>) -> Self {
             self.zones.insert(domain.to_owned(), record_sets);
             self
+        }
+
+        fn failing_with(error: HostingerApiError) -> Self {
+            Self {
+                zone_failure: Some(error),
+                ..Self::default()
+            }
         }
 
         fn zone_reads(&self) -> usize {
@@ -152,6 +168,9 @@ mod test {
     impl HostingerApi for FakeHostingerApi {
         fn zone(&self, domain: &str) -> Result<Vec<RecordSet>, HostingerApiError> {
             *self.zone_reads.lock().expect("unpoisoned") += 1;
+            if let Some(error) = &self.zone_failure {
+                return Err(error.clone());
+            }
             Ok(self.zones.get(domain).cloned().unwrap_or_default())
         }
 
@@ -179,6 +198,21 @@ mod test {
                 })
                 .collect(),
         }
+    }
+
+    fn status(status: u16, message: &str) -> HostingerApiError {
+        HostingerApiError::Status {
+            status,
+            message: message.to_owned(),
+            correlation_id: None,
+        }
+    }
+
+    fn reading_error(error: HostingerApiError) -> DnsGatewayError {
+        let gateway = HostingerDnsGateway::new(FakeHostingerApi::failing_with(error));
+        gateway
+            .addresses_of(&tracked("home"))
+            .expect_err("reading should fail")
     }
 
     fn tracked(name: &str) -> TrackedRecord {
@@ -299,5 +333,13 @@ mod test {
         gateway.addresses_of(&tracked("home")).expect("addresses");
 
         assert_eq!(2, gateway.api.zone_reads());
+    }
+
+    #[test]
+    fn should_report_401_as_unauthorized() {
+        assert_eq!(
+            DnsGatewayError::Unauthorized("Unauthenticated.".to_owned()),
+            reading_error(status(401, "Unauthenticated."))
+        );
     }
 }

@@ -14,4 +14,9 @@ pub trait HostingerApi {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum HostingerApiError {
     Unreachable(String),
+    Status {
+        status: u16,
+        message: String,
+        correlation_id: Option<String>,
+    },
 }
