@@ -35,7 +35,7 @@ impl<P: PublicIpGateway, D: DnsGateway> CheckRecordsUseCase for CheckRecords<P, 
             .iter()
             .map(|record| self.check(record, public_ip))
             .collect();
-        Ok(Report { records })
+        Ok(Report { public_ip, records })
     }
 }
 
