@@ -1,7 +1,7 @@
 use std::net::Ipv4Addr;
 
 use lib_core::{
-    entities::public_ip::PublicIp,
+    entities::public_ip::{PublicIp, PublicIpError},
     use_cases::public_ip_gateway::{PublicIpGateway, PublicIpGatewayError},
 };
 
@@ -28,7 +28,7 @@ impl<A: IpifyApi> PublicIpGateway for IpifyPublicIpGateway<A> {
             .parse()
             .map_err(|_| PublicIpGatewayError::InvalidAnswer(answer.clone()))?;
         PublicIp::try_from(address)
-            .map_err(|error| PublicIpGatewayError::Unavailable(format!("{error:?}")))
+            .map_err(|PublicIpError::NotPublic(address)| PublicIpGatewayError::NotPublic(address))
     }
 }
 
@@ -79,6 +79,18 @@ mod test {
 
         assert_eq!(
             Err(PublicIpGatewayError::InvalidAnswer("<html>".to_owned())),
+            result
+        );
+    }
+
+    #[test]
+    fn should_report_a_private_address_as_not_public() {
+        let result = gateway_answering("192.168.1.10").current_public_ip();
+
+        assert_eq!(
+            Err(PublicIpGatewayError::NotPublic(Ipv4Addr::new(
+                192, 168, 1, 10
+            ))),
             result
         );
     }
