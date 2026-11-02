@@ -121,6 +121,11 @@ fn translate_error(error: HostingerApiError) -> DnsGatewayError {
             message,
             ..
         } => DnsGatewayError::Rejected(message),
+        HostingerApiError::Status {
+            status: 429,
+            message,
+            ..
+        } => DnsGatewayError::RateLimited(message),
         HostingerApiError::Status { message, .. } => DnsGatewayError::Unavailable(message),
     }
 }
@@ -379,6 +384,14 @@ mod test {
                 "The ttl must be at least 60.".to_owned()
             )),
             gateway.point(&tracked("home"), public_ip)
+        );
+    }
+
+    #[test]
+    fn should_report_429_as_rate_limited() {
+        assert_eq!(
+            DnsGatewayError::RateLimited("Too Many Attempts.".to_owned()),
+            reading_error(status(429, "Too Many Attempts."))
         );
     }
 }
