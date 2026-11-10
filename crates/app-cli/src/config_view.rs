@@ -1,6 +1,6 @@
 use lib_core::entities::{domain_name::DomainNameError, label::LabelError, ttl::TtlError};
 
-use crate::config::ConfigError;
+use crate::{config::ConfigError, record_arguments::RecordArgumentError};
 
 /// What is wrong with the config, in words that point at the line to fix.
 pub fn explain_config_error(error: &ConfigError) -> String {
@@ -24,6 +24,22 @@ pub fn explain_config_error(error: &ConfigError) -> String {
             "invalid ttl for \"{name}\" in \"{domain}\": {}",
             ttl_problem(reason)
         ),
+    }
+}
+
+/// What is wrong with a `--record` or `--ttl` argument.
+pub fn explain_record_argument_error(error: &RecordArgumentError) -> String {
+    match error {
+        RecordArgumentError::MissingSeparator(argument) => format!(
+            "invalid record \"{argument}\": expected DOMAIN:NAME, for example example.com:home"
+        ),
+        RecordArgumentError::InvalidDomain { domain, reason } => {
+            format!("invalid domain \"{domain}\": {}", domain_problem(reason))
+        }
+        RecordArgumentError::InvalidRecordName { name, reason } => {
+            format!("invalid record name \"{name}\": {}", label_problem(reason))
+        }
+        RecordArgumentError::InvalidTtl(reason) => format!("invalid ttl: {}", ttl_problem(reason)),
     }
 }
 
@@ -54,7 +70,43 @@ fn ttl_problem(reason: &TtlError) -> &'static str {
 mod test {
     use lib_core::entities::{domain_name::DomainNameError, label::LabelError, ttl::TtlError};
 
-    use crate::{config::ConfigError, config_view::explain_config_error};
+    use crate::{
+        config::ConfigError,
+        config_view::{explain_config_error, explain_record_argument_error},
+        record_arguments::RecordArgumentError,
+    };
+
+    #[test]
+    fn should_explain_each_record_argument_error() {
+        let explanations = [
+            (
+                RecordArgumentError::MissingSeparator("example.com".to_owned()),
+                "invalid record \"example.com\": expected DOMAIN:NAME, for example example.com:home",
+            ),
+            (
+                RecordArgumentError::InvalidDomain {
+                    domain: "".to_owned(),
+                    reason: DomainNameError::Empty,
+                },
+                "invalid domain \"\": it is empty",
+            ),
+            (
+                RecordArgumentError::InvalidRecordName {
+                    name: "-home".to_owned(),
+                    reason: LabelError::HyphenAtEdge,
+                },
+                "invalid record name \"-home\": a label starts or ends with a hyphen",
+            ),
+            (
+                RecordArgumentError::InvalidTtl(TtlError::Zero),
+                "invalid ttl: it must be at least 1 second",
+            ),
+        ];
+
+        for (error, explanation) in explanations {
+            assert_eq!(explanation, explain_record_argument_error(&error));
+        }
+    }
 
     #[test]
     fn should_explain_each_config_error() {
