@@ -63,7 +63,7 @@ mod test {
     use std::sync::Arc;
 
     use crate::use_cases::{
-        dns_gateway::DnsGatewayError,
+        dns_gateway::{DnsGatewayError, PublishedRecord},
         public_ip_gateway::PublicIpGatewayError,
         report::{Outcome, RecordOutcome},
         sync_records::{SyncRecords, SyncRecordsUseCase},
@@ -108,6 +108,29 @@ mod test {
             outcome: Outcome::Pointed {
                 previous: published(&[OLD_ADDRESS]),
             },
+        };
+        assert_eq!(vec![expected], report.records);
+        assert_eq!(vec![(tracked("home"), public_ip())], dns_gateway.pointed());
+    }
+
+    #[test]
+    fn should_point_a_record_that_drifted_only_in_ttl() {
+        let current = PublishedRecord {
+            addresses: vec![PUBLIC_ADDRESS],
+            ttl: Some(3600),
+        };
+        let dns_gateway =
+            Arc::new(FakeDnsGateway::default().with_published("home", current.clone()));
+        let sync = SyncRecords::new(
+            Arc::new(FakePublicIpGateway(Ok(public_ip()))),
+            dns_gateway.clone(),
+        );
+
+        let report = sync.execute(&[tracked("home")]).expect("report");
+
+        let expected = RecordOutcome {
+            record: tracked("home"),
+            outcome: Outcome::Pointed { previous: current },
         };
         assert_eq!(vec![expected], report.records);
         assert_eq!(vec![(tracked("home"), public_ip())], dns_gateway.pointed());

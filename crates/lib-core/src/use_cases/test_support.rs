@@ -57,6 +57,11 @@ impl FakeDnsGateway {
         self
     }
 
+    pub(crate) fn with_published(mut self, name: &str, record: PublishedRecord) -> Self {
+        self.published.insert(name.to_owned(), Ok(record));
+        self
+    }
+
     pub(crate) fn with_read_failure(mut self, name: &str, error: DnsGatewayError) -> Self {
         self.published.insert(name.to_owned(), Err(error));
         self

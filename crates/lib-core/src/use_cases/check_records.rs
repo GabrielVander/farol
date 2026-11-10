@@ -41,7 +41,7 @@ impl<P: PublicIpGateway, D: DnsGateway> CheckRecordsUseCase for CheckRecords<P, 
 impl<P: PublicIpGateway, D: DnsGateway> CheckRecords<P, D> {
     fn check(&self, record: &TrackedRecord, public_ip: PublicIp) -> RecordOutcome {
         let outcome = match self.dns_gateway.published(record) {
-            Ok(current) => outcome_of(current, public_ip),
+            Ok(current) => outcome_of(current, record, public_ip),
             Err(error) => Outcome::Failed(error),
         };
         RecordOutcome {
@@ -51,11 +51,15 @@ impl<P: PublicIpGateway, D: DnsGateway> CheckRecords<P, D> {
     }
 }
 
-fn outcome_of(current: PublishedRecord, public_ip: PublicIp) -> Outcome {
-    if current.addresses == [public_ip.address()] {
+fn outcome_of(current: PublishedRecord, record: &TrackedRecord, public_ip: PublicIp) -> Outcome {
+    if is_up_to_date(&current, record, public_ip) {
         return Outcome::Unchanged;
     }
     Outcome::Drifted { current }
+}
+
+fn is_up_to_date(current: &PublishedRecord, record: &TrackedRecord, public_ip: PublicIp) -> bool {
+    current.addresses == [public_ip.address()] && current.ttl == Some(record.ttl.seconds())
 }
 
 #[cfg(test)]
@@ -66,7 +70,7 @@ mod test {
         use_cases::report::{Outcome, RecordOutcome},
         use_cases::{
             check_records::{CheckRecords, CheckRecordsUseCase},
-            dns_gateway::DnsGatewayError,
+            dns_gateway::{DnsGatewayError, PublishedRecord},
             public_ip_gateway::PublicIpGatewayError,
             test_support::{
                 FakeDnsGateway, FakePublicIpGateway, OLD_ADDRESS, PUBLIC_ADDRESS, public_ip,
@@ -107,6 +111,27 @@ mod test {
             outcome: Outcome::Drifted {
                 current: published(&[OLD_ADDRESS]),
             },
+        };
+        assert_eq!(vec![expected], report.records);
+    }
+
+    #[test]
+    fn should_report_drifted_when_only_the_ttl_differs() {
+        let current = PublishedRecord {
+            addresses: vec![PUBLIC_ADDRESS],
+            ttl: Some(3600),
+        };
+        let dns_gateway = FakeDnsGateway::default().with_published("home", current.clone());
+        let check = CheckRecords::new(
+            Arc::new(FakePublicIpGateway(Ok(public_ip()))),
+            Arc::new(dns_gateway),
+        );
+
+        let report = check.execute(&[tracked("home")]).expect("report");
+
+        let expected = RecordOutcome {
+            record: tracked("home"),
+            outcome: Outcome::Drifted { current },
         };
         assert_eq!(vec![expected], report.records);
     }
