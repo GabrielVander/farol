@@ -46,7 +46,7 @@ mod test {
     use lib_core::entities::{domain_name::DomainNameError, label::LabelError, ttl::TtlError};
 
     use crate::{
-        config_view::explain_record_argument_error, record_arguments::RecordArgumentError,
+        record_arguments::RecordArgumentError, record_arguments_view::explain_record_argument_error,
     };
 
     #[test]

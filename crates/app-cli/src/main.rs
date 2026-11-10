@@ -1,8 +1,8 @@
 use std::{env, process::ExitCode, sync::Arc, time::Duration};
 
 use app_cli::{
-    config_view::explain_record_argument_error,
     record_arguments::tracked_records,
+    record_arguments_view::explain_record_argument_error,
     report_view::{explain_public_ip_error, has_failures, render},
     token::{HOSTINGER_TOKEN_VARIABLE, hostinger_token},
 };
