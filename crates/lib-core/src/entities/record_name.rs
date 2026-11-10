@@ -2,6 +2,7 @@ use crate::entities::label::{LabelError, validate_labels};
 
 const APEX: &str = "@";
 const WILDCARD: &str = "*";
+const WILDCARD_PREFIX: &str = "*.";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RecordName(String);
@@ -16,10 +17,15 @@ impl TryFrom<&str> for RecordName {
     type Error = LabelError;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
-        if value != APEX && value != WILDCARD {
-            validate_labels(value)?;
-        }
+        validate(value)?;
         Ok(Self(value.to_ascii_lowercase()))
+    }
+}
+
+fn validate(value: &str) -> Result<(), LabelError> {
+    match value {
+        APEX | WILDCARD => Ok(()),
+        _ => validate_labels(value.strip_prefix(WILDCARD_PREFIX).unwrap_or(value)),
     }
 }
 
@@ -39,6 +45,13 @@ mod test {
         let name = RecordName::try_from("*").expect("valid record name");
 
         assert_eq!("*", name.as_str());
+    }
+
+    #[test]
+    fn should_accept_a_wildcard_followed_by_labels() {
+        let name = RecordName::try_from("*.home").expect("valid record name");
+
+        assert_eq!("*.home", name.as_str());
     }
 
     #[test]
