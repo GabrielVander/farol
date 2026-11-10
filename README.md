@@ -98,7 +98,7 @@ FAROL_HOSTINGER_TOKEN=...
 
 ## Development
 
-farol uses stable Rust, pinned in `rust-toolchain.toml`. See
+farol tracks stable Rust through `rust-toolchain.toml`. See
 [`CLAUDE.md`](CLAUDE.md) for the engineering rules: Clean Architecture with
 vertical slices, lightweight DDD, Clean Code and Canon TDD.
 
