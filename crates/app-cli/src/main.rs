@@ -22,6 +22,7 @@ use lib_ipify::infrastructure::{
 const IPIFY_URL: &str = "https://api.ipify.org";
 const IPIFY_TIMEOUT: Duration = Duration::from_secs(10);
 const HOSTINGER_URL: &str = "https://developers.hostinger.com";
+const HOSTINGER_TIMEOUT: Duration = Duration::from_secs(30);
 
 type PublicIpGateway = IpifyPublicIpGateway<UreqIpifyApi>;
 type DnsGateway = HostingerDnsGateway<UreqHostingerApi>;
@@ -106,7 +107,7 @@ fn dns_gateway(provider: Provider) -> Result<DnsGateway, String> {
         Provider::Hostinger => {
             let token = hostinger_token(environment)
                 .map_err(|_| format!("set {HOSTINGER_TOKEN_VARIABLE} to a Hostinger API token"))?;
-            let api = UreqHostingerApi::new(HOSTINGER_URL.to_owned(), token);
+            let api = UreqHostingerApi::new(HOSTINGER_URL.to_owned(), token, HOSTINGER_TIMEOUT);
             Ok(HostingerDnsGateway::new(api))
         }
     }

@@ -8,9 +8,9 @@ use crate::infrastructure::{
 };
 
 const ZONES_PATH: &str = "/api/dns/v1/zones/";
-const TIMEOUT: Duration = Duration::from_secs(30);
 
-/// Talks to Hostinger's DNS API at `base_url`, authenticated by an API token.
+/// Talks to Hostinger's DNS API at `base_url`, authenticated by an API token,
+/// giving up after `timeout`.
 pub struct UreqHostingerApi {
     base_url: String,
     token: String,
@@ -18,9 +18,9 @@ pub struct UreqHostingerApi {
 }
 
 impl UreqHostingerApi {
-    pub fn new(base_url: String, token: String) -> Self {
+    pub fn new(base_url: String, token: String, timeout: Duration) -> Self {
         let config = Agent::config_builder()
-            .timeout_global(Some(TIMEOUT))
+            .timeout_global(Some(timeout))
             .http_status_as_error(false)
             .build();
         Self {
@@ -98,6 +98,7 @@ mod test {
         io::{BufRead, BufReader, Write},
         net::TcpListener,
         thread::{self, JoinHandle},
+        time::Duration,
     };
 
     use serde_json::{Value, json};
@@ -109,6 +110,7 @@ mod test {
     };
 
     const TOKEN: &str = "secret-token";
+    const TIMEOUT: Duration = Duration::from_secs(5);
 
     fn home_record_set() -> RecordSet {
         RecordSet {
@@ -164,7 +166,7 @@ mod test {
             r#"[{"name":"home","records":[{"content":"8.8.8.8","is_disabled":false}],"ttl":300,"type":"A"}]"#,
         );
 
-        let zone = UreqHostingerApi::new(base_url, TOKEN.to_owned()).zone("example.com");
+        let zone = UreqHostingerApi::new(base_url, TOKEN.to_owned(), TIMEOUT).zone("example.com");
 
         assert_eq!(Ok(vec![home_record_set()]), zone);
         let request = server.join().expect("server").to_ascii_lowercase();
@@ -180,8 +182,8 @@ mod test {
             zone: vec![home_record_set()],
         };
 
-        let result =
-            UreqHostingerApi::new(base_url, TOKEN.to_owned()).update_zone("example.com", &request);
+        let result = UreqHostingerApi::new(base_url, TOKEN.to_owned(), TIMEOUT)
+            .update_zone("example.com", &request);
 
         assert_eq!(Ok(()), result);
         let sent = server.join().expect("server");
@@ -204,7 +206,7 @@ mod test {
             r#"{"message":"Unauthenticated.","correlation_id":"26a91bd9"}"#,
         );
 
-        let zone = UreqHostingerApi::new(base_url, TOKEN.to_owned()).zone("example.com");
+        let zone = UreqHostingerApi::new(base_url, TOKEN.to_owned(), TIMEOUT).zone("example.com");
 
         let expected = HostingerApiError::Status {
             status: 401,
@@ -218,7 +220,7 @@ mod test {
     fn should_use_an_unexpected_error_body_as_the_message() {
         let (base_url, _server) = serve_once("502 Bad Gateway", "<html>Bad Gateway</html>");
 
-        let zone = UreqHostingerApi::new(base_url, TOKEN.to_owned()).zone("example.com");
+        let zone = UreqHostingerApi::new(base_url, TOKEN.to_owned(), TIMEOUT).zone("example.com");
 
         let expected = HostingerApiError::Status {
             status: 502,
@@ -232,7 +234,7 @@ mod test {
     fn should_report_a_body_that_is_not_a_zone_as_invalid() {
         let (base_url, _server) = serve_once("200 OK", r#"{"unexpected":true}"#);
 
-        let zone = UreqHostingerApi::new(base_url, TOKEN.to_owned()).zone("example.com");
+        let zone = UreqHostingerApi::new(base_url, TOKEN.to_owned(), TIMEOUT).zone("example.com");
 
         assert!(matches!(zone, Err(HostingerApiError::InvalidBody(_))));
     }
@@ -243,8 +245,9 @@ mod test {
             .and_then(|listener| listener.local_addr())
             .expect("address");
 
-        let zone = UreqHostingerApi::new(format!("http://{closed_port}"), TOKEN.to_owned())
-            .zone("example.com");
+        let zone =
+            UreqHostingerApi::new(format!("http://{closed_port}"), TOKEN.to_owned(), TIMEOUT)
+                .zone("example.com");
 
         assert!(matches!(zone, Err(HostingerApiError::Unreachable(_))));
     }
