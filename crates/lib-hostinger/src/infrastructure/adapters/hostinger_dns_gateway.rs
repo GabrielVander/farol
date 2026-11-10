@@ -79,7 +79,8 @@ fn addresses_in(
 fn ttl_in(record_sets: &[RecordSet], record: &TrackedRecord) -> Option<u32> {
     record_sets
         .iter()
-        .find(|record_set| holds_addresses_of(record_set, record))
+        .filter(|record_set| holds_addresses_of(record_set, record))
+        .find(|record_set| record_set.records.iter().any(|value| !value.is_disabled))
         .map(|record_set| record_set.ttl)
 }
 
@@ -278,6 +279,29 @@ mod test {
         let ttl = gateway.published(&tracked("home")).expect("published").ttl;
 
         assert_eq!(Some(3600), ttl);
+    }
+
+    #[test]
+    fn should_find_no_ttl_for_a_record_missing_from_the_zone() {
+        let api = FakeHostingerApi::default()
+            .with_zone("example.com", vec![record_set("lab", "A", &["8.8.8.8"])]);
+        let gateway = HostingerDnsGateway::new(api);
+
+        let ttl = gateway.published(&tracked("home")).expect("published").ttl;
+
+        assert_eq!(None, ttl);
+    }
+
+    #[test]
+    fn should_find_no_ttl_for_a_record_with_only_disabled_values() {
+        let mut home = record_set("home", "A", &["8.8.8.8"]);
+        home.records[0].is_disabled = true;
+        let api = FakeHostingerApi::default().with_zone("example.com", vec![home]);
+        let gateway = HostingerDnsGateway::new(api);
+
+        let ttl = gateway.published(&tracked("home")).expect("published").ttl;
+
+        assert_eq!(None, ttl);
     }
 
     #[test]
