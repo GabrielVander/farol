@@ -1,31 +1,6 @@
 use lib_core::entities::{domain_name::DomainNameError, label::LabelError, ttl::TtlError};
 
-use crate::{config::ConfigError, record_arguments::RecordArgumentError};
-
-/// What is wrong with the config, in words that point at the line to fix.
-pub fn explain_config_error(error: &ConfigError) -> String {
-    match error {
-        ConfigError::InvalidToml(detail) => format!("the config is not valid TOML: {detail}"),
-        ConfigError::NoRecords => "the config has no [[records]]".to_owned(),
-        ConfigError::UnknownProvider(provider) => {
-            format!("unknown provider \"{provider}\" (supported: hostinger)")
-        }
-        ConfigError::InvalidDomain { domain, reason } => {
-            format!("invalid domain \"{domain}\": {}", domain_problem(reason))
-        }
-        ConfigError::InvalidRecordName { name, reason } => {
-            format!("invalid record name \"{name}\": {}", label_problem(reason))
-        }
-        ConfigError::InvalidTtl {
-            domain,
-            name,
-            reason,
-        } => format!(
-            "invalid ttl for \"{name}\" in \"{domain}\": {}",
-            ttl_problem(reason)
-        ),
-    }
-}
+use crate::record_arguments::RecordArgumentError;
 
 /// What is wrong with a `--record` or `--ttl` argument.
 pub fn explain_record_argument_error(error: &RecordArgumentError) -> String {
@@ -71,9 +46,7 @@ mod test {
     use lib_core::entities::{domain_name::DomainNameError, label::LabelError, ttl::TtlError};
 
     use crate::{
-        config::ConfigError,
-        config_view::{explain_config_error, explain_record_argument_error},
-        record_arguments::RecordArgumentError,
+        config_view::explain_record_argument_error, record_arguments::RecordArgumentError,
     };
 
     #[test]
@@ -109,47 +82,6 @@ mod test {
     }
 
     #[test]
-    fn should_explain_each_config_error() {
-        let explanations = [
-            (
-                ConfigError::InvalidToml("expected a value".to_owned()),
-                "the config is not valid TOML: expected a value",
-            ),
-            (ConfigError::NoRecords, "the config has no [[records]]"),
-            (
-                ConfigError::UnknownProvider("cloudflare".to_owned()),
-                "unknown provider \"cloudflare\" (supported: hostinger)",
-            ),
-            (
-                ConfigError::InvalidDomain {
-                    domain: "".to_owned(),
-                    reason: DomainNameError::Empty,
-                },
-                "invalid domain \"\": it is empty",
-            ),
-            (
-                ConfigError::InvalidRecordName {
-                    name: "-home".to_owned(),
-                    reason: LabelError::HyphenAtEdge,
-                },
-                "invalid record name \"-home\": a label starts or ends with a hyphen",
-            ),
-            (
-                ConfigError::InvalidTtl {
-                    domain: "example.com".to_owned(),
-                    name: "home".to_owned(),
-                    reason: TtlError::Zero,
-                },
-                "invalid ttl for \"home\" in \"example.com\": it must be at least 1 second",
-            ),
-        ];
-
-        for (error, explanation) in explanations {
-            assert_eq!(explanation, explain_config_error(&error));
-        }
-    }
-
-    #[test]
     fn should_explain_each_domain_problem() {
         let explanations = [
             (DomainNameError::TooLong, "it is longer than 253 characters"),
@@ -168,13 +100,13 @@ mod test {
         ];
 
         for (reason, problem) in explanations {
-            let error = ConfigError::InvalidDomain {
+            let error = RecordArgumentError::InvalidDomain {
                 domain: "x".to_owned(),
                 reason,
             };
             assert_eq!(
                 format!("invalid domain \"x\": {problem}"),
-                explain_config_error(&error)
+                explain_record_argument_error(&error)
             );
         }
     }
