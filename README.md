@@ -13,7 +13,7 @@ It runs once and exits. Schedule it with a systemd timer or cron.
 ## Install
 
 ```sh
-cargo install --path crates/app-cli
+cargo install --locked --path crates/app-cli
 ```
 
 This installs the `farol` binary into `~/.cargo/bin`.
