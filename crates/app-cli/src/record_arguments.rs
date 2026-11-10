@@ -51,4 +51,15 @@ mod test {
 
         assert_eq!(Ok(vec![tracked("example.com", "home", 600)]), records);
     }
+
+    #[test]
+    fn should_keep_several_records_in_order_across_domains() {
+        let records = tracked_records(&arguments(&["example.org:lab", "example.com:home"]), 300);
+
+        let expected = vec![
+            tracked("example.org", "lab", 300),
+            tracked("example.com", "home", 300),
+        ];
+        assert_eq!(Ok(expected), records);
+    }
 }
