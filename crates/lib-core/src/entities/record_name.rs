@@ -71,6 +71,14 @@ mod test {
     }
 
     #[test]
+    fn should_reject_two_wildcards() {
+        assert_eq!(
+            Err(LabelError::InvalidCharacter('*')),
+            RecordName::try_from("*.*")
+        );
+    }
+
+    #[test]
     fn should_reject_an_invalid_label() {
         assert_eq!(
             Err(LabelError::InvalidCharacter('_')),
