@@ -120,3 +120,15 @@ fn public_ip_gateway() -> PublicIpGateway {
 fn environment(key: &str) -> Option<String> {
     env::var(key).ok()
 }
+
+#[cfg(test)]
+mod test {
+    use clap::CommandFactory;
+
+    use crate::Cli;
+
+    #[test]
+    fn should_define_a_valid_command_line() {
+        Cli::command().debug_assert();
+    }
+}
