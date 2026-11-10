@@ -63,6 +63,14 @@ mod test {
     }
 
     #[test]
+    fn should_reject_a_wildcard_that_is_not_leftmost() {
+        assert_eq!(
+            Err(LabelError::InvalidCharacter('*')),
+            RecordName::try_from("home.*")
+        );
+    }
+
+    #[test]
     fn should_reject_an_invalid_label() {
         assert_eq!(
             Err(LabelError::InvalidCharacter('_')),
