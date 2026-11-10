@@ -48,7 +48,7 @@ impl<A: HostingerApi> DnsGateway for HostingerDnsGateway<A> {
         let record_sets = self.zone(record.domain.as_str())?;
         Ok(PublishedRecord {
             addresses: addresses_in(&record_sets, record)?,
-            ttl: None,
+            ttl: ttl_in(&record_sets, record),
         })
     }
 
@@ -74,6 +74,13 @@ fn addresses_in(
         .filter(|value| !value.is_disabled)
         .map(parse_address)
         .collect()
+}
+
+fn ttl_in(record_sets: &[RecordSet], record: &TrackedRecord) -> Option<u32> {
+    record_sets
+        .iter()
+        .find(|record_set| holds_addresses_of(record_set, record))
+        .map(|record_set| record_set.ttl)
 }
 
 fn holds_addresses_of(record_set: &RecordSet, record: &TrackedRecord) -> bool {
@@ -259,6 +266,18 @@ mod test {
             .addresses;
 
         assert_eq!(vec![Ipv4Addr::new(8, 8, 8, 8)], addresses);
+    }
+
+    #[test]
+    fn should_read_the_ttl_of_a_matching_a_record() {
+        let mut home = record_set("home", "A", &["8.8.8.8"]);
+        home.ttl = 3600;
+        let api = FakeHostingerApi::default().with_zone("example.com", vec![home]);
+        let gateway = HostingerDnsGateway::new(api);
+
+        let ttl = gateway.published(&tracked("home")).expect("published").ttl;
+
+        assert_eq!(Some(3600), ttl);
     }
 
     #[test]
