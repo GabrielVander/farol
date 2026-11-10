@@ -3,7 +3,7 @@ pub const HOSTINGER_TOKEN_VARIABLE: &str = "FAROL_HOSTINGER_TOKEN";
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MissingToken;
 
-/// The Hostinger API token, read from the environment so it never sits in the config file.
+/// The Hostinger API token, read from the environment because other users can read arguments.
 pub fn hostinger_token(
     environment: impl Fn(&str) -> Option<String>,
 ) -> Result<String, MissingToken> {
