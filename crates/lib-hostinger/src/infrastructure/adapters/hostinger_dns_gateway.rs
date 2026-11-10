@@ -273,6 +273,20 @@ mod test {
     }
 
     #[test]
+    fn should_read_a_wildcard_record_by_its_exact_name() {
+        let zone = vec![
+            record_set("home", "A", &["1.1.1.1"]),
+            record_set("*", "A", &["8.8.8.8"]),
+        ];
+        let api = FakeHostingerApi::default().with_zone("example.com", zone);
+        let gateway = HostingerDnsGateway::new(api);
+
+        let addresses = gateway.addresses_of(&tracked("*")).expect("addresses");
+
+        assert_eq!(vec![Ipv4Addr::new(8, 8, 8, 8)], addresses);
+    }
+
+    #[test]
     fn should_ignore_other_types_and_names() {
         let api = FakeHostingerApi::default().with_zone(
             "example.com",
