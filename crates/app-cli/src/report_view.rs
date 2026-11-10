@@ -3,7 +3,7 @@ use std::net::Ipv4Addr;
 use lib_core::{
     entities::tracked_record::TrackedRecord,
     use_cases::{
-        dns_gateway::DnsGatewayError,
+        dns_gateway::{DnsGatewayError, PublishedRecord},
         public_ip_gateway::PublicIpGatewayError,
         report::{Outcome, RecordOutcome, Report},
     },
@@ -53,8 +53,8 @@ fn record_line(record_outcome: &RecordOutcome) -> String {
 fn describe(outcome: &Outcome) -> String {
     match outcome {
         Outcome::Unchanged => "unchanged".to_owned(),
-        Outcome::Drifted { current } => format!("drifted (now {})", list(&current.addresses)),
-        Outcome::Pointed { previous } => format!("pointed (was {})", list(&previous.addresses)),
+        Outcome::Drifted { current } => format!("drifted (now {})", summary(current)),
+        Outcome::Pointed { previous } => format!("pointed (was {})", summary(previous)),
         Outcome::Failed(error) => format!("failed, {}", explain(error)),
     }
 }
@@ -82,6 +82,14 @@ fn detail(error: &DnsGatewayError) -> &str {
         | DnsGatewayError::DomainNotFound(detail)
         | DnsGatewayError::Rejected(detail)
         | DnsGatewayError::RateLimited(detail) => detail,
+    }
+}
+
+fn summary(published: &PublishedRecord) -> String {
+    let addresses = list(&published.addresses);
+    match published.ttl {
+        Some(ttl) => format!("{addresses}, TTL {ttl}"),
+        None => addresses,
     }
 }
 
@@ -211,6 +219,32 @@ mod test {
                     previous: published(previous)
                 }
             ))
+        );
+    }
+
+    #[test]
+    fn should_render_the_ttl_of_a_drifted_record() {
+        let current = PublishedRecord {
+            addresses: vec![Ipv4Addr::new(1, 1, 1, 1)],
+            ttl: Some(3600),
+        };
+
+        assert_eq!(
+            "home.example.com: drifted (now 1.1.1.1, TTL 3600)",
+            record_line(&report_with("home", Outcome::Drifted { current }))
+        );
+    }
+
+    #[test]
+    fn should_render_the_previous_ttl_of_a_pointed_record() {
+        let previous = PublishedRecord {
+            addresses: vec![Ipv4Addr::new(1, 1, 1, 1)],
+            ttl: Some(3600),
+        };
+
+        assert_eq!(
+            "home.example.com: pointed (was 1.1.1.1, TTL 3600)",
+            record_line(&report_with("home", Outcome::Pointed { previous }))
         );
     }
 
