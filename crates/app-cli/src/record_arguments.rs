@@ -3,21 +3,29 @@ use lib_core::entities::{
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum RecordArgumentError {}
+pub enum RecordArgumentError {
+    MissingSeparator(String),
+}
 
 /// Turns `DOMAIN:NAME` arguments into tracked records that share one TTL.
 pub fn tracked_records(
     arguments: &[String],
     ttl: u32,
 ) -> Result<Vec<TrackedRecord>, RecordArgumentError> {
-    Ok(arguments
+    arguments
         .iter()
-        .filter_map(|argument| tracked_record(argument, ttl))
-        .collect())
+        .filter_map(|argument| tracked_record(argument, ttl).transpose())
+        .collect()
 }
 
-fn tracked_record(argument: &str, ttl: u32) -> Option<TrackedRecord> {
-    let (domain, name) = argument.split_once(':')?;
+fn tracked_record(argument: &str, ttl: u32) -> Result<Option<TrackedRecord>, RecordArgumentError> {
+    let (domain, name) = argument
+        .split_once(':')
+        .ok_or_else(|| RecordArgumentError::MissingSeparator(argument.to_owned()))?;
+    Ok(named_record(domain, name, ttl))
+}
+
+fn named_record(domain: &str, name: &str, ttl: u32) -> Option<TrackedRecord> {
     Some(TrackedRecord {
         domain: DomainName::try_from(domain).ok()?,
         name: RecordName::try_from(name).ok()?,
@@ -31,7 +39,7 @@ mod test {
         domain_name::DomainName, record_name::RecordName, tracked_record::TrackedRecord, ttl::Ttl,
     };
 
-    use crate::record_arguments::tracked_records;
+    use crate::record_arguments::{RecordArgumentError, tracked_records};
 
     fn arguments(values: &[&str]) -> Vec<String> {
         values.iter().map(|value| (*value).to_owned()).collect()
@@ -50,6 +58,14 @@ mod test {
         let records = tracked_records(&arguments(&["example.com:home"]), 600);
 
         assert_eq!(Ok(vec![tracked("example.com", "home", 600)]), records);
+    }
+
+    #[test]
+    fn should_reject_an_argument_without_a_separator_and_quote_it() {
+        let records = tracked_records(&arguments(&["example.com"]), 300);
+
+        let expected = RecordArgumentError::MissingSeparator("example.com".to_owned());
+        assert_eq!(Err(expected), records);
     }
 
     #[test]
