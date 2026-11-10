@@ -1,10 +1,17 @@
 use lib_core::entities::{
-    domain_name::DomainName, record_name::RecordName, tracked_record::TrackedRecord, ttl::Ttl,
+    domain_name::{DomainName, DomainNameError},
+    record_name::RecordName,
+    tracked_record::TrackedRecord,
+    ttl::Ttl,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RecordArgumentError {
     MissingSeparator(String),
+    InvalidDomain {
+        domain: String,
+        reason: DomainNameError,
+    },
 }
 
 /// Turns `DOMAIN:NAME` arguments into tracked records that share one TTL.
@@ -22,12 +29,20 @@ fn tracked_record(argument: &str, ttl: u32) -> Result<Option<TrackedRecord>, Rec
     let (domain, name) = argument
         .split_once(':')
         .ok_or_else(|| RecordArgumentError::MissingSeparator(argument.to_owned()))?;
+    let domain = parse_domain(domain)?;
     Ok(named_record(domain, name, ttl))
 }
 
-fn named_record(domain: &str, name: &str, ttl: u32) -> Option<TrackedRecord> {
+fn parse_domain(domain: &str) -> Result<DomainName, RecordArgumentError> {
+    DomainName::try_from(domain).map_err(|reason| RecordArgumentError::InvalidDomain {
+        domain: domain.to_owned(),
+        reason,
+    })
+}
+
+fn named_record(domain: DomainName, name: &str, ttl: u32) -> Option<TrackedRecord> {
     Some(TrackedRecord {
-        domain: DomainName::try_from(domain).ok()?,
+        domain,
         name: RecordName::try_from(name).ok()?,
         ttl: Ttl::try_from(ttl).ok()?,
     })
@@ -36,7 +51,11 @@ fn named_record(domain: &str, name: &str, ttl: u32) -> Option<TrackedRecord> {
 #[cfg(test)]
 mod test {
     use lib_core::entities::{
-        domain_name::DomainName, record_name::RecordName, tracked_record::TrackedRecord, ttl::Ttl,
+        domain_name::{DomainName, DomainNameError},
+        label::LabelError,
+        record_name::RecordName,
+        tracked_record::TrackedRecord,
+        ttl::Ttl,
     };
 
     use crate::record_arguments::{RecordArgumentError, tracked_records};
@@ -65,6 +84,17 @@ mod test {
         let records = tracked_records(&arguments(&["example.com"]), 300);
 
         let expected = RecordArgumentError::MissingSeparator("example.com".to_owned());
+        assert_eq!(Err(expected), records);
+    }
+
+    #[test]
+    fn should_reject_an_invalid_domain_and_name_it() {
+        let records = tracked_records(&arguments(&["exa_mple.com:home"]), 300);
+
+        let expected = RecordArgumentError::InvalidDomain {
+            domain: "exa_mple.com".to_owned(),
+            reason: DomainNameError::Label(LabelError::InvalidCharacter('_')),
+        };
         assert_eq!(Err(expected), records);
     }
 
