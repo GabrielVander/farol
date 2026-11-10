@@ -1,5 +1,6 @@
 use lib_core::entities::{
     domain_name::{DomainName, DomainNameError},
+    label::LabelError,
     record_name::RecordName,
     tracked_record::TrackedRecord,
     ttl::Ttl,
@@ -11,6 +12,10 @@ pub enum RecordArgumentError {
     InvalidDomain {
         domain: String,
         reason: DomainNameError,
+    },
+    InvalidRecordName {
+        name: String,
+        reason: LabelError,
     },
 }
 
@@ -30,7 +35,9 @@ fn tracked_record(argument: &str, ttl: u32) -> Result<Option<TrackedRecord>, Rec
         .split_once(':')
         .ok_or_else(|| RecordArgumentError::MissingSeparator(argument.to_owned()))?;
     let domain = parse_domain(domain)?;
-    Ok(named_record(domain, name, ttl))
+    let name = parse_record_name(name)?;
+    let ttl = Ttl::try_from(ttl).ok();
+    Ok(ttl.map(|ttl| TrackedRecord { domain, name, ttl }))
 }
 
 fn parse_domain(domain: &str) -> Result<DomainName, RecordArgumentError> {
@@ -40,11 +47,10 @@ fn parse_domain(domain: &str) -> Result<DomainName, RecordArgumentError> {
     })
 }
 
-fn named_record(domain: DomainName, name: &str, ttl: u32) -> Option<TrackedRecord> {
-    Some(TrackedRecord {
-        domain,
-        name: RecordName::try_from(name).ok()?,
-        ttl: Ttl::try_from(ttl).ok()?,
+fn parse_record_name(name: &str) -> Result<RecordName, RecordArgumentError> {
+    RecordName::try_from(name).map_err(|reason| RecordArgumentError::InvalidRecordName {
+        name: name.to_owned(),
+        reason,
     })
 }
 
@@ -94,6 +100,17 @@ mod test {
         let expected = RecordArgumentError::InvalidDomain {
             domain: "exa_mple.com".to_owned(),
             reason: DomainNameError::Label(LabelError::InvalidCharacter('_')),
+        };
+        assert_eq!(Err(expected), records);
+    }
+
+    #[test]
+    fn should_reject_an_invalid_record_name_and_name_it() {
+        let records = tracked_records(&arguments(&["example.com:-home"]), 300);
+
+        let expected = RecordArgumentError::InvalidRecordName {
+            name: "-home".to_owned(),
+            reason: LabelError::HyphenAtEdge,
         };
         assert_eq!(Err(expected), records);
     }
