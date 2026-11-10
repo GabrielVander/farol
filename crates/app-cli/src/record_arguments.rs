@@ -116,6 +116,17 @@ mod test {
     }
 
     #[test]
+    fn should_reject_a_second_separator_as_part_of_the_record_name() {
+        let records = tracked_records(&arguments(&["example.com:home:600"]), 300);
+
+        let expected = RecordArgumentError::InvalidRecordName {
+            name: "home:600".to_owned(),
+            reason: LabelError::InvalidCharacter(':'),
+        };
+        assert_eq!(Err(expected), records);
+    }
+
+    #[test]
     fn should_track_the_apex_of_a_domain() {
         let records = tracked_records(&arguments(&["example.com:@"]), 300);
 
