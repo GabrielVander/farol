@@ -1,10 +1,9 @@
-use std::net::Ipv4Addr;
 use std::sync::Arc;
 
 use crate::{
     entities::{public_ip::PublicIp, tracked_record::TrackedRecord},
     use_cases::{
-        dns_gateway::DnsGateway,
+        dns_gateway::{DnsGateway, PublishedRecord},
         public_ip_gateway::{PublicIpGateway, PublicIpGatewayError},
         report::{Outcome, RecordOutcome, Report},
     },
@@ -41,8 +40,8 @@ impl<P: PublicIpGateway, D: DnsGateway> CheckRecordsUseCase for CheckRecords<P, 
 
 impl<P: PublicIpGateway, D: DnsGateway> CheckRecords<P, D> {
     fn check(&self, record: &TrackedRecord, public_ip: PublicIp) -> RecordOutcome {
-        let outcome = match self.dns_gateway.addresses_of(record) {
-            Ok(addresses) => outcome_of(addresses, public_ip),
+        let outcome = match self.dns_gateway.published(record) {
+            Ok(current) => outcome_of(current, public_ip),
             Err(error) => Outcome::Failed(error),
         };
         RecordOutcome {
@@ -52,11 +51,11 @@ impl<P: PublicIpGateway, D: DnsGateway> CheckRecords<P, D> {
     }
 }
 
-fn outcome_of(addresses: Vec<Ipv4Addr>, public_ip: PublicIp) -> Outcome {
-    if addresses == [public_ip.address()] {
+fn outcome_of(current: PublishedRecord, public_ip: PublicIp) -> Outcome {
+    if current.addresses == [public_ip.address()] {
         return Outcome::Unchanged;
     }
-    Outcome::Drifted { addresses }
+    Outcome::Drifted { current }
 }
 
 #[cfg(test)]
@@ -71,7 +70,7 @@ mod test {
             public_ip_gateway::PublicIpGatewayError,
             test_support::{
                 FakeDnsGateway, FakePublicIpGateway, OLD_ADDRESS, PUBLIC_ADDRESS, public_ip,
-                tracked,
+                published, tracked,
             },
         },
     };
@@ -106,7 +105,7 @@ mod test {
         let expected = RecordOutcome {
             record: tracked("home"),
             outcome: Outcome::Drifted {
-                addresses: vec![OLD_ADDRESS],
+                current: published(&[OLD_ADDRESS]),
             },
         };
         assert_eq!(vec![expected], report.records);
@@ -123,7 +122,9 @@ mod test {
 
         let expected = RecordOutcome {
             record: tracked("home"),
-            outcome: Outcome::Drifted { addresses: vec![] },
+            outcome: Outcome::Drifted {
+                current: published(&[]),
+            },
         };
         assert_eq!(vec![expected], report.records);
     }
@@ -142,7 +143,7 @@ mod test {
         let expected = RecordOutcome {
             record: tracked("home"),
             outcome: Outcome::Drifted {
-                addresses: addresses.to_vec(),
+                current: published(&addresses),
             },
         };
         assert_eq!(vec![expected], report.records);

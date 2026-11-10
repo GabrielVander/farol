@@ -6,7 +6,7 @@ use std::{
 
 use lib_core::{
     entities::{public_ip::PublicIp, tracked_record::TrackedRecord},
-    use_cases::dns_gateway::{DnsGateway, DnsGatewayError},
+    use_cases::dns_gateway::{DnsGateway, DnsGatewayError, PublishedRecord},
 };
 
 use crate::infrastructure::{
@@ -44,9 +44,12 @@ impl<A: HostingerApi> HostingerDnsGateway<A> {
 }
 
 impl<A: HostingerApi> DnsGateway for HostingerDnsGateway<A> {
-    fn addresses_of(&self, record: &TrackedRecord) -> Result<Vec<Ipv4Addr>, DnsGatewayError> {
+    fn published(&self, record: &TrackedRecord) -> Result<PublishedRecord, DnsGatewayError> {
         let record_sets = self.zone(record.domain.as_str())?;
-        addresses_in(&record_sets, record)
+        Ok(PublishedRecord {
+            addresses: addresses_in(&record_sets, record)?,
+            ttl: None,
+        })
     }
 
     fn point(&self, record: &TrackedRecord, public_ip: PublicIp) -> Result<(), DnsGatewayError> {
@@ -232,7 +235,7 @@ mod test {
     fn reading_error(error: HostingerApiError) -> DnsGatewayError {
         let gateway = HostingerDnsGateway::new(FakeHostingerApi::failing_with(error));
         gateway
-            .addresses_of(&tracked("home"))
+            .published(&tracked("home"))
             .expect_err("reading should fail")
     }
 
@@ -250,7 +253,10 @@ mod test {
             .with_zone("example.com", vec![record_set("home", "A", &["8.8.8.8"])]);
         let gateway = HostingerDnsGateway::new(api);
 
-        let addresses = gateway.addresses_of(&tracked("home")).expect("addresses");
+        let addresses = gateway
+            .published(&tracked("home"))
+            .expect("published")
+            .addresses;
 
         assert_eq!(vec![Ipv4Addr::new(8, 8, 8, 8)], addresses);
     }
@@ -281,7 +287,10 @@ mod test {
         let api = FakeHostingerApi::default().with_zone("example.com", zone);
         let gateway = HostingerDnsGateway::new(api);
 
-        let addresses = gateway.addresses_of(&tracked("*")).expect("addresses");
+        let addresses = gateway
+            .published(&tracked("*"))
+            .expect("published")
+            .addresses;
 
         assert_eq!(vec![Ipv4Addr::new(8, 8, 8, 8)], addresses);
     }
@@ -316,7 +325,10 @@ mod test {
         );
         let gateway = HostingerDnsGateway::new(api);
 
-        let addresses = gateway.addresses_of(&tracked("home")).expect("addresses");
+        let addresses = gateway
+            .published(&tracked("home"))
+            .expect("published")
+            .addresses;
 
         assert_eq!(vec![Ipv4Addr::new(8, 8, 8, 8)], addresses);
     }
@@ -328,7 +340,10 @@ mod test {
         let api = FakeHostingerApi::default().with_zone("example.com", vec![home]);
         let gateway = HostingerDnsGateway::new(api);
 
-        let addresses = gateway.addresses_of(&tracked("home")).expect("addresses");
+        let addresses = gateway
+            .published(&tracked("home"))
+            .expect("published")
+            .addresses;
 
         assert_eq!(vec![Ipv4Addr::new(8, 8, 8, 8)], addresses);
     }
@@ -339,7 +354,10 @@ mod test {
             .with_zone("example.com", vec![record_set("lab", "A", &["8.8.8.8"])]);
         let gateway = HostingerDnsGateway::new(api);
 
-        let addresses = gateway.addresses_of(&tracked("home")).expect("addresses");
+        let addresses = gateway
+            .published(&tracked("home"))
+            .expect("published")
+            .addresses;
 
         assert!(addresses.is_empty());
     }
@@ -352,7 +370,9 @@ mod test {
 
         assert_eq!(
             Err(DnsGatewayError::InvalidAnswer("not-an-ip".to_owned())),
-            gateway.addresses_of(&tracked("home"))
+            gateway
+                .published(&tracked("home"))
+                .map(|published| published.addresses)
         );
     }
 
@@ -367,8 +387,8 @@ mod test {
         );
         let gateway = HostingerDnsGateway::new(api);
 
-        gateway.addresses_of(&tracked("@")).expect("addresses");
-        gateway.addresses_of(&tracked("home")).expect("addresses");
+        gateway.published(&tracked("@")).expect("published");
+        gateway.published(&tracked("home")).expect("published");
 
         assert_eq!(1, gateway.api.zone_reads());
     }
@@ -380,9 +400,9 @@ mod test {
         let gateway = HostingerDnsGateway::new(api);
         let public_ip = PublicIp::try_from(Ipv4Addr::new(8, 8, 8, 8)).expect("public ip");
 
-        gateway.addresses_of(&tracked("home")).expect("addresses");
+        gateway.published(&tracked("home")).expect("published");
         gateway.point(&tracked("home"), public_ip).expect("pointed");
-        gateway.addresses_of(&tracked("home")).expect("addresses");
+        gateway.published(&tracked("home")).expect("published");
 
         assert_eq!(2, gateway.api.zone_reads());
     }

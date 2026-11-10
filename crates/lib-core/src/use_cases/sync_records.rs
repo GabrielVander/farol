@@ -45,12 +45,10 @@ impl<P: PublicIpGateway, D: DnsGateway> SyncRecordsUseCase for SyncRecords<P, D>
 impl<P: PublicIpGateway, D: DnsGateway> SyncRecords<P, D> {
     fn sync(&self, checked: RecordOutcome, public_ip: PublicIp) -> RecordOutcome {
         let outcome = match checked.outcome {
-            Outcome::Drifted { addresses } => self
+            Outcome::Drifted { current } => self
                 .dns_gateway
                 .point(&checked.record, public_ip)
-                .map_or_else(Outcome::Failed, |()| Outcome::Pointed {
-                    previous: addresses,
-                }),
+                .map_or_else(Outcome::Failed, |()| Outcome::Pointed { previous: current }),
             other => other,
         };
         RecordOutcome {
@@ -70,7 +68,8 @@ mod test {
         report::{Outcome, RecordOutcome},
         sync_records::{SyncRecords, SyncRecordsUseCase},
         test_support::{
-            FakeDnsGateway, FakePublicIpGateway, OLD_ADDRESS, PUBLIC_ADDRESS, public_ip, tracked,
+            FakeDnsGateway, FakePublicIpGateway, OLD_ADDRESS, PUBLIC_ADDRESS, public_ip, published,
+            tracked,
         },
     };
 
@@ -107,7 +106,7 @@ mod test {
         let expected = RecordOutcome {
             record: tracked("home"),
             outcome: Outcome::Pointed {
-                previous: vec![OLD_ADDRESS],
+                previous: published(&[OLD_ADDRESS]),
             },
         };
         assert_eq!(vec![expected], report.records);
@@ -138,7 +137,7 @@ mod test {
             RecordOutcome {
                 record: tracked("lab"),
                 outcome: Outcome::Pointed {
-                    previous: vec![OLD_ADDRESS],
+                    previous: published(&[OLD_ADDRESS]),
                 },
             },
         ];

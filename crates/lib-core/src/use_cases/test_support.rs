@@ -6,13 +6,14 @@ use crate::{
         tracked_record::TrackedRecord, ttl::Ttl,
     },
     use_cases::{
-        dns_gateway::{DnsGateway, DnsGatewayError},
+        dns_gateway::{DnsGateway, DnsGatewayError, PublishedRecord},
         public_ip_gateway::{PublicIpGateway, PublicIpGatewayError},
     },
 };
 
 pub(crate) const PUBLIC_ADDRESS: Ipv4Addr = Ipv4Addr::new(8, 8, 8, 8);
 pub(crate) const OLD_ADDRESS: Ipv4Addr = Ipv4Addr::new(1, 1, 1, 1);
+const TRACKED_TTL: u32 = 300;
 
 pub(crate) fn public_ip() -> PublicIp {
     PublicIp::try_from(PUBLIC_ADDRESS).expect("public ip")
@@ -22,7 +23,15 @@ pub(crate) fn tracked(name: &str) -> TrackedRecord {
     TrackedRecord {
         domain: DomainName::try_from("example.com").expect("valid domain"),
         name: RecordName::try_from(name).expect("valid record name"),
-        ttl: Ttl::try_from(300).expect("valid ttl"),
+        ttl: Ttl::try_from(TRACKED_TTL).expect("valid ttl"),
+    }
+}
+
+/// A published record with the TTL `tracked` asks for, or none without addresses.
+pub(crate) fn published(addresses: &[Ipv4Addr]) -> PublishedRecord {
+    PublishedRecord {
+        addresses: addresses.to_vec(),
+        ttl: (!addresses.is_empty()).then_some(TRACKED_TTL),
     }
 }
 
@@ -36,20 +45,20 @@ impl PublicIpGateway for FakePublicIpGateway {
 
 #[derive(Default)]
 pub(crate) struct FakeDnsGateway {
-    addresses: HashMap<String, Result<Vec<Ipv4Addr>, DnsGatewayError>>,
+    published: HashMap<String, Result<PublishedRecord, DnsGatewayError>>,
     point_failures: HashMap<String, DnsGatewayError>,
     pointed: Mutex<Vec<(TrackedRecord, PublicIp)>>,
 }
 
 impl FakeDnsGateway {
     pub(crate) fn with_addresses(mut self, name: &str, addresses: &[Ipv4Addr]) -> Self {
-        self.addresses
-            .insert(name.to_owned(), Ok(addresses.to_vec()));
+        self.published
+            .insert(name.to_owned(), Ok(published(addresses)));
         self
     }
 
     pub(crate) fn with_read_failure(mut self, name: &str, error: DnsGatewayError) -> Self {
-        self.addresses.insert(name.to_owned(), Err(error));
+        self.published.insert(name.to_owned(), Err(error));
         self
     }
 
@@ -64,9 +73,9 @@ impl FakeDnsGateway {
 }
 
 impl DnsGateway for FakeDnsGateway {
-    fn addresses_of(&self, record: &TrackedRecord) -> Result<Vec<Ipv4Addr>, DnsGatewayError> {
-        let stored = self.addresses.get(record.name.as_str()).cloned();
-        stored.unwrap_or(Ok(Vec::new()))
+    fn published(&self, record: &TrackedRecord) -> Result<PublishedRecord, DnsGatewayError> {
+        let stored = self.published.get(record.name.as_str()).cloned();
+        stored.unwrap_or_else(|| Ok(published(&[])))
     }
 
     fn point(&self, record: &TrackedRecord, public_ip: PublicIp) -> Result<(), DnsGatewayError> {
