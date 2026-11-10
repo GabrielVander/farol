@@ -161,6 +161,14 @@ mod test {
     }
 
     #[test]
+    fn should_render_a_wildcard_by_its_full_name() {
+        assert_eq!(
+            "*.example.com: unchanged",
+            record_line(&report_with("*", Outcome::Unchanged))
+        );
+    }
+
+    #[test]
     fn should_render_a_drifted_record_with_its_current_addresses() {
         let addresses = vec![Ipv4Addr::new(1, 1, 1, 1), Ipv4Addr::new(2, 2, 2, 2)];
 
