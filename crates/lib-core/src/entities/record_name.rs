@@ -79,6 +79,11 @@ mod test {
     }
 
     #[test]
+    fn should_reject_a_wildcard_followed_by_nothing() {
+        assert_eq!(Err(LabelError::Empty), RecordName::try_from("*."));
+    }
+
+    #[test]
     fn should_reject_an_invalid_label() {
         assert_eq!(
             Err(LabelError::InvalidCharacter('_')),
