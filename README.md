@@ -21,39 +21,28 @@ This installs the `farol` binary into `~/.cargo/bin`.
 ## Configure
 
 1. Create a Hostinger API token in hPanel under **Profile → API**.
-2. Export it. farol never reads the token from the config file:
+2. Export it. The token is not an argument because other users on the machine
+   can read a process's arguments:
 
    ```sh
    export FAROL_HOSTINGER_TOKEN=...
    ```
 
-3. Write a config listing the records to keep pointed at this machine. See
-   [`examples/config.toml`](examples/config.toml):
-
-   ```toml
-   provider = "hostinger"
-
-   [[records]]
-   domain = "example.com"
-   name = "home"   # use "@" for example.com itself
-   ttl = 300
-   ```
-
-farol looks for the config in this order:
-
-1. The path given with `--config`.
-2. `$XDG_CONFIG_HOME/farol/config.toml`.
-3. `~/.config/farol/config.toml`.
-
 ## Use
 
 ```sh
-farol check   # show which records have drifted, change nothing
-farol sync    # point every drifted record at the public IP
+farol check --provider hostinger --record example.com:home   # show drift, change nothing
+farol sync --provider hostinger --record example.com:home    # point drifted records at the public IP
 ```
 
+| Option | Meaning |
+|--------|---------|
+| `--provider` | The DNS provider. Required. `hostinger` is the only one so far. |
+| `--record DOMAIN:NAME` | A record to keep pointed at this machine. Required and repeatable. Use `@` as the name for the domain itself. |
+| `--ttl SECONDS` | The TTL of every record farol points. Defaults to 300. |
+
 ```
-$ farol sync
+$ farol sync --provider hostinger --record example.com:@ --record example.com:home
 public IP 203.0.113.7
 example.com: unchanged
 home.example.com: pointed (was 198.51.100.4)
@@ -61,26 +50,27 @@ home.example.com: pointed (was 198.51.100.4)
 
 A record has **drifted** when its A records are anything other than exactly
 the public IP: missing, different, or several. Pointing a record replaces all
-of its A records with a single one holding the public IP and the configured
-TTL. Other record types and other names are left alone.
+of its A records with a single one holding the public IP and the `--ttl` value.
+Other record types and other names are left alone.
 
 ### Exit status
 
 | Status | Meaning |
 |--------|---------|
 | `0` | Every record is unchanged, drifted (`check`) or pointed (`sync`). |
-| `1` | A record failed, the public IP couldn't be found, or the config or token is missing or invalid. Details go to stderr. |
+| `1` | A record failed, the public IP couldn't be found, a record or TTL is invalid, or the token is missing. Details go to stderr. |
+| `2` | The command line is wrong, for example no `--record`. |
 
 ## Run on a schedule with systemd
 
 [`contrib/systemd`](contrib/systemd) has a hardened service and a timer that
 runs `farol sync` every five minutes. The service runs as an unprivileged
-dynamic user with no write access anywhere.
+dynamic user with no write access anywhere. Edit the `--record` values in
+`farol.service` before installing it.
 
 ```sh
 sudo install -m 755 ~/.cargo/bin/farol /usr/local/bin/farol
 sudo install -d /etc/farol
-sudo install -m 644 examples/config.toml /etc/farol/config.toml   # then edit it
 sudo install -m 600 /dev/null /etc/farol/farol.env
 echo 'FAROL_HOSTINGER_TOKEN=...' | sudo tee /etc/farol/farol.env >/dev/null
 sudo install -m 644 contrib/systemd/farol.service contrib/systemd/farol.timer /etc/systemd/system/
@@ -101,7 +91,7 @@ once per run, so a five-minute schedule stays far below that limit.
 ### Or with cron
 
 ```cron
-*/5 * * * * FAROL_HOSTINGER_TOKEN=... /usr/local/bin/farol sync
+*/5 * * * * FAROL_HOSTINGER_TOKEN=... /usr/local/bin/farol sync --provider hostinger --record example.com:home
 ```
 
 ## Development
@@ -121,7 +111,7 @@ cargo llvm-cov --workspace
 | `lib-core` | Entities, use cases (check, sync) and gateway traits |
 | `lib-ipify` | Finds the public IP through ipify |
 | `lib-hostinger` | Reads and points A records through Hostinger's DNS API |
-| `app-cli` | The `farol` command: config, output and wiring |
+| `app-cli` | The `farol` command: arguments, output and wiring |
 
 A new DNS provider is a new slice crate that implements `DnsGateway`.
 

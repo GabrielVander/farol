@@ -5,7 +5,8 @@ After=network-online.target
 
 [Service]
 Type=oneshot
-ExecStart=/usr/local/bin/farol --config /etc/farol/config.toml sync
+# Replace the records with your own. Use @ as the name for the domain itself.
+ExecStart=/usr/local/bin/farol sync --provider hostinger --record example.com:home
 # Holds FAROL_HOSTINGER_TOKEN=... ; systemd reads it as root, so keep it 0600.
 EnvironmentFile=/etc/farol/farol.env
 
