@@ -3,7 +3,7 @@ use lib_core::entities::{
     label::LabelError,
     record_name::RecordName,
     tracked_record::TrackedRecord,
-    ttl::Ttl,
+    ttl::{Ttl, TtlError},
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -17,6 +17,7 @@ pub enum RecordArgumentError {
         name: String,
         reason: LabelError,
     },
+    InvalidTtl(TtlError),
 }
 
 /// Turns `DOMAIN:NAME` arguments into tracked records that share one TTL.
@@ -24,20 +25,22 @@ pub fn tracked_records(
     arguments: &[String],
     ttl: u32,
 ) -> Result<Vec<TrackedRecord>, RecordArgumentError> {
+    let ttl = Ttl::try_from(ttl).map_err(RecordArgumentError::InvalidTtl)?;
     arguments
         .iter()
-        .filter_map(|argument| tracked_record(argument, ttl).transpose())
+        .map(|argument| tracked_record(argument, ttl))
         .collect()
 }
 
-fn tracked_record(argument: &str, ttl: u32) -> Result<Option<TrackedRecord>, RecordArgumentError> {
+fn tracked_record(argument: &str, ttl: Ttl) -> Result<TrackedRecord, RecordArgumentError> {
     let (domain, name) = argument
         .split_once(':')
         .ok_or_else(|| RecordArgumentError::MissingSeparator(argument.to_owned()))?;
-    let domain = parse_domain(domain)?;
-    let name = parse_record_name(name)?;
-    let ttl = Ttl::try_from(ttl).ok();
-    Ok(ttl.map(|ttl| TrackedRecord { domain, name, ttl }))
+    Ok(TrackedRecord {
+        domain: parse_domain(domain)?,
+        name: parse_record_name(name)?,
+        ttl,
+    })
 }
 
 fn parse_domain(domain: &str) -> Result<DomainName, RecordArgumentError> {
@@ -61,7 +64,7 @@ mod test {
         label::LabelError,
         record_name::RecordName,
         tracked_record::TrackedRecord,
-        ttl::Ttl,
+        ttl::{Ttl, TtlError},
     };
 
     use crate::record_arguments::{RecordArgumentError, tracked_records};
@@ -124,6 +127,16 @@ mod test {
             reason: LabelError::InvalidCharacter(':'),
         };
         assert_eq!(Err(expected), records);
+    }
+
+    #[test]
+    fn should_reject_a_zero_ttl() {
+        let records = tracked_records(&arguments(&["example.com:home"]), 0);
+
+        assert_eq!(
+            Err(RecordArgumentError::InvalidTtl(TtlError::Zero)),
+            records
+        );
     }
 
     #[test]
