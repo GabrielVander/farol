@@ -55,7 +55,7 @@ struct RecordOptions {
     /// DNS provider that hosts the records
     #[arg(long, value_enum)]
     provider: Provider,
-    /// Record to track, repeatable. Use @ as the name for the domain itself
+    /// Record to track, repeatable. Use @ as the name for the domain itself, * for a wildcard
     #[arg(long = "record", value_name = "DOMAIN:NAME", required = true)]
     records: Vec<String>,
     /// TTL in seconds for records farol points

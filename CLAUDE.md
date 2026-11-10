@@ -108,8 +108,8 @@ Use these terms, and only these, in code, tests and discussion:
 - **Public IP:** the IPv4 address the internet sees for this machine. Never
   private, loopback, link-local or unspecified.
 - **Domain:** the DNS zone, for example `example.com`.
-- **Record name:** a name relative to the domain: `@` for the apex, or labels
-  such as `home`.
+- **Record name:** a name relative to the domain: `@` for the apex, labels
+  such as `home`, or a wildcard (`*` as the leftmost label, as in `*.home`).
 - **TTL:** a record's time to live, in seconds, never zero.
 - **Tracked record:** a record farol keeps pointed at the public IP: a domain,
   a record name and a TTL.

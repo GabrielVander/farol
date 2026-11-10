@@ -38,7 +38,7 @@ farol sync --provider hostinger --record example.com:home    # point drifted rec
 | Option | Meaning |
 |--------|---------|
 | `--provider` | The DNS provider. Required. `hostinger` is the only one so far. |
-| `--record DOMAIN:NAME` | A record to keep pointed at this machine. Required and repeatable. Use `@` as the name for the domain itself. |
+| `--record DOMAIN:NAME` | A record to keep pointed at this machine. Required and repeatable. Use `@` as the name for the domain itself, and `*` or `*.home` for a wildcard. Quote wildcards so the shell leaves them alone: `--record 'example.com:*'`. |
 | `--ttl SECONDS` | The TTL of every record farol points. Defaults to 300. |
 
 ```
