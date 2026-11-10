@@ -1,13 +1,12 @@
-use std::{env, fs, path::PathBuf, process::ExitCode, sync::Arc, time::Duration};
+use std::{env, process::ExitCode, sync::Arc, time::Duration};
 
 use app_cli::{
-    config::{Config, Provider},
-    config_path::config_path,
-    config_view::explain_config_error,
+    config_view::explain_record_argument_error,
+    record_arguments::tracked_records,
     report_view::{explain_public_ip_error, has_failures, render},
     token::{HOSTINGER_TOKEN_VARIABLE, hostinger_token},
 };
-use clap::{Parser, Subcommand};
+use clap::{Args, Parser, Subcommand, ValueEnum};
 use lib_core::use_cases::{
     check_records::{CheckRecords, CheckRecordsUseCase},
     report::Report,
@@ -31,24 +30,47 @@ type DnsGateway = HostingerDnsGateway<UreqHostingerApi>;
 #[derive(Parser)]
 #[command(version)]
 struct Cli {
-    /// Config file (default: $XDG_CONFIG_HOME/farol/config.toml)
-    #[arg(long)]
-    config: Option<PathBuf>,
     #[command(subcommand)]
     command: Command,
 }
 
-#[derive(Subcommand, Clone, Copy)]
+#[derive(Subcommand)]
 enum Command {
     /// Show which records have drifted, without changing them
-    Check,
+    Check(RecordOptions),
     /// Point every drifted record at the public IP
-    Sync,
+    Sync(RecordOptions),
+}
+
+impl Command {
+    fn options(&self) -> &RecordOptions {
+        match self {
+            Self::Check(options) | Self::Sync(options) => options,
+        }
+    }
+}
+
+#[derive(Args)]
+struct RecordOptions {
+    /// DNS provider that hosts the records
+    #[arg(long, value_enum)]
+    provider: Provider,
+    /// Record to track, repeatable. Use @ as the name for the domain itself
+    #[arg(long = "record", value_name = "DOMAIN:NAME", required = true)]
+    records: Vec<String>,
+    /// TTL in seconds for records farol points
+    #[arg(long, default_value_t = 300)]
+    ttl: u32,
+}
+
+#[derive(Clone, Copy, ValueEnum)]
+enum Provider {
+    Hostinger,
 }
 
 fn main() -> ExitCode {
     let cli = Cli::parse();
-    match run(cli) {
+    match run(cli.command) {
         Ok(report) => print_report(&report),
         Err(message) => {
             eprintln!("farol: {message}");
@@ -57,15 +79,15 @@ fn main() -> ExitCode {
     }
 }
 
-fn run(cli: Cli) -> Result<Report, String> {
-    let config = load_config(cli.config)?;
-    let dns_gateway = Arc::new(dns_gateway(config.provider)?);
+fn run(command: Command) -> Result<Report, String> {
+    let options = command.options();
+    let records = tracked_records(&options.records, options.ttl)
+        .map_err(|error| explain_record_argument_error(&error))?;
+    let dns_gateway = Arc::new(dns_gateway(options.provider)?);
     let public_ip_gateway = Arc::new(public_ip_gateway());
-    let report = match cli.command {
-        Command::Check => {
-            CheckRecords::new(public_ip_gateway, dns_gateway).execute(&config.records)
-        }
-        Command::Sync => SyncRecords::new(public_ip_gateway, dns_gateway).execute(&config.records),
+    let report = match command {
+        Command::Check(_) => CheckRecords::new(public_ip_gateway, dns_gateway).execute(&records),
+        Command::Sync(_) => SyncRecords::new(public_ip_gateway, dns_gateway).execute(&records),
     };
     report.map_err(|error| explain_public_ip_error(&error))
 }
@@ -76,15 +98,6 @@ fn print_report(report: &Report) -> ExitCode {
         true => ExitCode::FAILURE,
         false => ExitCode::SUCCESS,
     }
-}
-
-fn load_config(explicit: Option<PathBuf>) -> Result<Config, String> {
-    let path = config_path(explicit, environment)
-        .ok_or("no config found: pass --config, or set XDG_CONFIG_HOME or HOME")?;
-    let text = fs::read_to_string(&path)
-        .map_err(|error| format!("could not read {}: {error}", path.display()))?;
-    Config::parse(&text)
-        .map_err(|error| format!("{}: {}", path.display(), explain_config_error(&error)))
 }
 
 fn dns_gateway(provider: Provider) -> Result<DnsGateway, String> {
