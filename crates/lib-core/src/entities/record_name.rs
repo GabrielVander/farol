@@ -55,6 +55,14 @@ mod test {
     }
 
     #[test]
+    fn should_reject_a_wildcard_inside_a_label() {
+        assert_eq!(
+            Err(LabelError::InvalidCharacter('*')),
+            RecordName::try_from("ho*me")
+        );
+    }
+
+    #[test]
     fn should_reject_an_invalid_label() {
         assert_eq!(
             Err(LabelError::InvalidCharacter('_')),
