@@ -140,6 +140,13 @@ mod test {
     }
 
     #[test]
+    fn should_track_a_wildcard_of_a_domain() {
+        let records = tracked_records(&arguments(&["example.com:*"]), 300);
+
+        assert_eq!(Ok(vec![tracked("example.com", "*", 300)]), records);
+    }
+
+    #[test]
     fn should_track_the_apex_of_a_domain() {
         let records = tracked_records(&arguments(&["example.com:@"]), 300);
 
