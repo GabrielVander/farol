@@ -287,6 +287,23 @@ mod test {
     }
 
     #[test]
+    fn should_point_a_wildcard_record_by_its_exact_name() {
+        let gateway = HostingerDnsGateway::new(FakeHostingerApi::default());
+        let public_ip = PublicIp::try_from(Ipv4Addr::new(8, 8, 8, 8)).expect("public ip");
+
+        gateway.point(&tracked("*"), public_ip).expect("pointed");
+
+        let expected = UpdateZoneRequest {
+            overwrite: true,
+            zone: vec![record_set("*", "A", &["8.8.8.8"])],
+        };
+        assert_eq!(
+            vec![("example.com".to_owned(), expected)],
+            gateway.api.updates()
+        );
+    }
+
+    #[test]
     fn should_ignore_other_types_and_names() {
         let api = FakeHostingerApi::default().with_zone(
             "example.com",
