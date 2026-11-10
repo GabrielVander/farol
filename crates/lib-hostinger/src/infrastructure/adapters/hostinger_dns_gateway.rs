@@ -135,7 +135,7 @@ fn detail(message: String, correlation_id: Option<String>) -> String {
 
 fn error_for_status(status: u16) -> fn(String) -> DnsGatewayError {
     match status {
-        401 => DnsGatewayError::Unauthorized,
+        401 | 403 => DnsGatewayError::Unauthorized,
         404 => DnsGatewayError::DomainNotFound,
         422 => DnsGatewayError::Rejected,
         429 => DnsGatewayError::RateLimited,
@@ -455,6 +455,14 @@ mod test {
         assert_eq!(
             DnsGatewayError::Unauthorized("Unauthenticated.".to_owned()),
             reading_error(status(401, "Unauthenticated."))
+        );
+    }
+
+    #[test]
+    fn should_report_403_as_unauthorized() {
+        assert_eq!(
+            DnsGatewayError::Unauthorized("Forbidden.".to_owned()),
+            reading_error(status(403, "Forbidden."))
         );
     }
 
