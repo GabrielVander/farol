@@ -92,7 +92,8 @@ once per run, so a five-minute schedule stays far below that limit.
 ### Or with cron
 
 ```cron
-*/5 * * * * FAROL_HOSTINGER_TOKEN=... /usr/local/bin/farol sync --provider hostinger --record example.com:home
+FAROL_HOSTINGER_TOKEN=...
+*/5 * * * * /usr/local/bin/farol sync --provider hostinger --record example.com:home
 ```
 
 ## Development
