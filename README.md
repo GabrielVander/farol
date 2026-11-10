@@ -39,17 +39,18 @@ farol sync --provider hostinger --record example.com:home    # point drifted rec
 |--------|---------|
 | `--provider` | The DNS provider. Required. `hostinger` is the only one so far. |
 | `--record DOMAIN:NAME` | A record to keep pointed at this machine. Required and repeatable. Use `@` as the name for the domain itself, and `*` or `*.home` for a wildcard. Quote wildcards so the shell leaves them alone: `--record 'example.com:*'`. |
-| `--ttl SECONDS` | The TTL of every record farol points. Defaults to 300. |
+| `--ttl SECONDS` | The TTL every tracked record should have. Defaults to 300, so a record with any other TTL counts as drifted unless you pass its value here. |
 
 ```
 $ farol sync --provider hostinger --record example.com:@ --record example.com:home
 public IP 203.0.113.7
 example.com: unchanged
-home.example.com: pointed (was 198.51.100.4)
+home.example.com: pointed (was 198.51.100.4, TTL 300)
 ```
 
 A record has **drifted** when its A records are anything other than exactly
-the public IP: missing, different, or several. Pointing a record replaces all
+the public IP (missing, different, or several) or its TTL differs from
+`--ttl`. Pointing a record replaces all
 of its A records with a single one holding the public IP and the `--ttl` value.
 Other record types and other names are left alone.
 
