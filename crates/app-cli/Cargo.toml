@@ -13,3 +13,6 @@ lib-core = { workspace = true }
 lib-ipify = { workspace = true }
 lib-hostinger = { workspace = true }
 clap = { workspace = true }
+
+[lints]
+workspace = true

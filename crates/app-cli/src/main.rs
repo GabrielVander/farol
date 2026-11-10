@@ -70,7 +70,7 @@ enum Provider {
 
 fn main() -> ExitCode {
     let cli = Cli::parse();
-    match run(cli.command) {
+    match run(&cli.command) {
         Ok(report) => print_report(&report),
         Err(message) => {
             eprintln!("farol: {message}");
@@ -79,7 +79,7 @@ fn main() -> ExitCode {
     }
 }
 
-fn run(command: Command) -> Result<Report, String> {
+fn run(command: &Command) -> Result<Report, String> {
     let options = command.options();
     let records = tracked_records(&options.records, options.ttl)
         .map_err(|error| explain_record_argument_error(&error))?;
@@ -94,9 +94,10 @@ fn run(command: Command) -> Result<Report, String> {
 
 fn print_report(report: &Report) -> ExitCode {
     print!("{}", render(report));
-    match has_failures(report) {
-        true => ExitCode::FAILURE,
-        false => ExitCode::SUCCESS,
+    if has_failures(report) {
+        ExitCode::FAILURE
+    } else {
+        ExitCode::SUCCESS
     }
 }
 
