@@ -1,6 +1,8 @@
 use lib_core::use_cases::{
-    dns_gateway::{DnsGatewayError, PublishedRecord},
-    public_ip_gateway::PublicIpGatewayError,
+    ports::{
+        dns_gateway::{DnsGatewayError, PublishedRecord},
+        public_ip_gateway::PublicIpGatewayError,
+    },
     report::{Outcome, RecordOutcome},
 };
 use lib_core_testing::{

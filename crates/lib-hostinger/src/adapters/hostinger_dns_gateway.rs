@@ -6,7 +6,7 @@ use std::{
 
 use lib_core::{
     entities::{public_ip::PublicIp, tracked_record::TrackedRecord},
-    use_cases::dns_gateway::{DnsGateway, DnsGatewayError, PublishedRecord},
+    use_cases::ports::dns_gateway::{DnsGateway, DnsGatewayError, PublishedRecord},
 };
 
 use crate::adapters::{
@@ -152,7 +152,7 @@ mod test {
             domain_name::DomainName, public_ip::PublicIp, record_name::RecordName,
             tracked_record::TrackedRecord, ttl::Ttl,
         },
-        use_cases::dns_gateway::{DnsGateway, DnsGatewayError},
+        use_cases::ports::dns_gateway::{DnsGateway, DnsGatewayError},
     };
 
     use crate::adapters::{

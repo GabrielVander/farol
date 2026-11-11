@@ -7,7 +7,9 @@ use app_cli::{
     run::{Infrastructure, Termination, run},
 };
 use clap::error::ErrorKind;
-use lib_core::use_cases::{dns_gateway::DnsGatewayError, public_ip_gateway::PublicIpGatewayError};
+use lib_core::use_cases::ports::{
+    dns_gateway::DnsGatewayError, public_ip_gateway::PublicIpGatewayError,
+};
 use lib_core_testing::{
     fakes::{FakeDnsGateway, FakePublicIpGateway},
     fixtures::{OLD_ADDRESS, PUBLIC_ADDRESS, public_ip, tracked},

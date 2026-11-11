@@ -5,7 +5,7 @@ use lib_core::{
         domain_name::DomainName, public_ip::PublicIp, record_name::RecordName,
         tracked_record::TrackedRecord, ttl::Ttl,
     },
-    use_cases::dns_gateway::PublishedRecord,
+    use_cases::ports::dns_gateway::PublishedRecord,
 };
 
 pub const PUBLIC_ADDRESS: Ipv4Addr = Ipv4Addr::new(8, 8, 8, 8);

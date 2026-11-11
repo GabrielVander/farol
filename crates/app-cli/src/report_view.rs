@@ -3,8 +3,10 @@ use std::net::Ipv4Addr;
 use lib_core::{
     entities::tracked_record::TrackedRecord,
     use_cases::{
-        dns_gateway::{DnsGatewayError, PublishedRecord},
-        public_ip_gateway::PublicIpGatewayError,
+        ports::{
+            dns_gateway::{DnsGatewayError, PublishedRecord},
+            public_ip_gateway::PublicIpGatewayError,
+        },
         report::{Outcome, RecordOutcome, Report},
     },
 };
@@ -118,8 +120,10 @@ mod test {
             tracked_record::TrackedRecord, ttl::Ttl,
         },
         use_cases::{
-            dns_gateway::{DnsGatewayError, PublishedRecord},
-            public_ip_gateway::PublicIpGatewayError,
+            ports::{
+                dns_gateway::{DnsGatewayError, PublishedRecord},
+                public_ip_gateway::PublicIpGatewayError,
+            },
             report::{Outcome, RecordOutcome, Report},
         },
     };

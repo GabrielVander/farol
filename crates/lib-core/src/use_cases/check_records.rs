@@ -3,8 +3,10 @@ use std::sync::Arc;
 use crate::{
     entities::{public_ip::PublicIp, tracked_record::TrackedRecord},
     use_cases::{
-        dns_gateway::{DnsGateway, PublishedRecord},
-        public_ip_gateway::{PublicIpGateway, PublicIpGatewayError},
+        ports::{
+            dns_gateway::{DnsGateway, PublishedRecord},
+            public_ip_gateway::{PublicIpGateway, PublicIpGatewayError},
+        },
         report::{Outcome, RecordOutcome, Report},
     },
 };

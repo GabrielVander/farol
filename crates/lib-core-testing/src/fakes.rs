@@ -6,7 +6,7 @@ use std::{
 
 use lib_core::{
     entities::{public_ip::PublicIp, tracked_record::TrackedRecord},
-    use_cases::{
+    use_cases::ports::{
         dns_gateway::{DnsGateway, DnsGatewayError, PublishedRecord},
         public_ip_gateway::{PublicIpGateway, PublicIpGatewayError},
     },

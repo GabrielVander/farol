@@ -2,7 +2,7 @@ use std::net::Ipv4Addr;
 
 use lib_core::{
     entities::public_ip::{PublicIp, PublicIpError},
-    use_cases::public_ip_gateway::{PublicIpGateway, PublicIpGatewayError},
+    use_cases::ports::public_ip_gateway::{PublicIpGateway, PublicIpGatewayError},
 };
 
 use crate::adapters::ipify_api::{IpifyApi, IpifyApiError};
@@ -44,7 +44,7 @@ fn not_public(PublicIpError::NotPublic(address): PublicIpError) -> PublicIpGatew
 mod test {
     use std::net::Ipv4Addr;
 
-    use lib_core::use_cases::public_ip_gateway::{PublicIpGateway, PublicIpGatewayError};
+    use lib_core::use_cases::ports::public_ip_gateway::{PublicIpGateway, PublicIpGatewayError};
 
     use crate::adapters::{
         ipify_api::{IpifyApi, IpifyApiError},

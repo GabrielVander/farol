@@ -4,8 +4,10 @@ use lib_core::{
     entities::{public_ip::PublicIp, tracked_record::TrackedRecord},
     use_cases::{
         check_records::{CheckRecords, CheckRecordsUseCase},
-        dns_gateway::{DnsGatewayError, PublishedRecord},
-        public_ip_gateway::PublicIpGatewayError,
+        ports::{
+            dns_gateway::{DnsGatewayError, PublishedRecord},
+            public_ip_gateway::PublicIpGatewayError,
+        },
         report::Report,
         sync_records::{SyncRecords, SyncRecordsUseCase},
     },

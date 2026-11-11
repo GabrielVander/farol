@@ -3,8 +3,7 @@ use std::{ffi::OsString, sync::Arc};
 use clap::Parser;
 use lib_core::use_cases::{
     check_records::{CheckRecords, CheckRecordsUseCase},
-    dns_gateway::DnsGateway,
-    public_ip_gateway::PublicIpGateway,
+    ports::{dns_gateway::DnsGateway, public_ip_gateway::PublicIpGateway},
     report::Report,
     sync_records::{SyncRecords, SyncRecordsUseCase},
 };

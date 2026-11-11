@@ -1,6 +1,6 @@
 use crate::{
     entities::{public_ip::PublicIp, tracked_record::TrackedRecord},
-    use_cases::dns_gateway::{DnsGatewayError, PublishedRecord},
+    use_cases::ports::dns_gateway::{DnsGatewayError, PublishedRecord},
 };
 
 /// What a check or a sync found for every tracked record.
