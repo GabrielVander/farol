@@ -12,10 +12,16 @@ use lib_core::{
     },
 };
 
-use crate::fixtures::published;
+use crate::fixtures::{public_ip, published};
 
 #[derive(Debug, Clone)]
 pub struct FakePublicIpGateway(pub Result<PublicIp, PublicIpGatewayError>);
+
+impl Default for FakePublicIpGateway {
+    fn default() -> Self {
+        Self(Ok(public_ip()))
+    }
+}
 
 impl PublicIpGateway for FakePublicIpGateway {
     fn current_public_ip(&self) -> Result<PublicIp, PublicIpGatewayError> {

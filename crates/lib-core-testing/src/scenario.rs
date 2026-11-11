@@ -15,24 +15,15 @@ use lib_core::{
 
 use crate::{
     fakes::{FakeDnsGateway, FakePublicIpGateway},
-    fixtures::{public_ip, tracked},
+    fixtures::tracked,
 };
 
 /// A world farol runs in: a public IP and a DNS provider, both fake. Tests say
 /// what the world holds and what farol does, never how the use cases are built.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Scenario {
     public_ip_gateway: FakePublicIpGateway,
     dns_gateway: FakeDnsGateway,
-}
-
-impl Default for Scenario {
-    fn default() -> Self {
-        Self {
-            public_ip_gateway: FakePublicIpGateway(Ok(public_ip())),
-            dns_gateway: FakeDnsGateway::default(),
-        }
-    }
 }
 
 impl Scenario {
