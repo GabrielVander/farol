@@ -31,9 +31,10 @@ impl<P: PublicIpGateway, D: DnsGateway> WatchRecordsUseCase for WatchRecords<P, 
             return Ok(None);
         }
 
-        self.last_synced = Some(public_ip);
+        let report = self.sync_records.sync_to(records, public_ip);
+        self.last_synced = (!report.has_failures()).then_some(public_ip);
 
-        Ok(Some(self.sync_records.sync_to(records, public_ip)))
+        Ok(Some(report))
     }
 }
 

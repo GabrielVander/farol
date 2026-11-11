@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use lib_core::use_cases::{
+    ports::dns_gateway::DnsGatewayError,
     report::{Outcome, RecordOutcome, Report},
     watch_records::{WatchRecords, WatchRecordsUseCase},
 };
@@ -74,4 +75,28 @@ fn should_sync_again_when_the_public_ip_changes() {
         ],
         dns_gateway.pointed()
     );
+}
+
+#[test]
+fn should_retry_a_round_that_had_a_failed_record() {
+    let error = DnsGatewayError::Unavailable("timeout".to_owned());
+    let dns_gateway = FakeDnsGateway::default().with_read_failure("home", error.clone());
+    let mut watch_records = WatchRecords::new(
+        Arc::new(FakePublicIpGateway::default()),
+        Arc::new(dns_gateway),
+    );
+    watch_records
+        .execute(&[tracked("home")])
+        .expect("first round");
+
+    let report = watch_records.execute(&[tracked("home")]);
+
+    let expected = Report {
+        public_ip: public_ip(),
+        records: vec![RecordOutcome {
+            record: tracked("home"),
+            outcome: Outcome::Failed(error),
+        }],
+    };
+    assert_eq!(Ok(Some(expected)), report);
 }
