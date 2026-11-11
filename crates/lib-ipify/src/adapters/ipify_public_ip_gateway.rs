@@ -21,6 +21,7 @@ impl<A: IpifyApi> PublicIpGateway for IpifyPublicIpGateway<A> {
     fn current_public_ip(&self) -> Result<PublicIp, PublicIpGatewayError> {
         let answer = self.api.fetch_answer().map_err(unavailable)?;
         let address = parse_address(&answer)?;
+
         PublicIp::try_from(address).map_err(not_public)
     }
 }

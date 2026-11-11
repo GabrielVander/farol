@@ -14,6 +14,7 @@ impl UreqIpifyApi {
         let config = Agent::config_builder()
             .timeout_global(Some(timeout))
             .build();
+
         Self {
             url,
             agent: config.into(),
@@ -50,15 +51,19 @@ mod test {
     fn serve_once(response: &'static str) -> (String, JoinHandle<String>) {
         let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
         let url = format!("http://{}/", listener.local_addr().expect("address"));
+
         let server = thread::spawn(move || {
             let (mut stream, _) = listener.accept().expect("accept");
             let mut request_line = String::new();
             BufReader::new(&stream)
                 .read_line(&mut request_line)
                 .expect("read");
+
             stream.write_all(response.as_bytes()).expect("write");
+
             request_line
         });
+
         (url, server)
     }
 
