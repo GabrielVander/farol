@@ -15,20 +15,6 @@ pub trait SyncRecordsUseCase {
     fn execute(&self, records: &[TrackedRecord]) -> Result<Report, PublicIpGatewayError>;
 }
 
-pub struct SyncRecords<P: PublicIpGateway, D: DnsGateway> {
-    check: CheckRecords<P, D>,
-    dns_gateway: Arc<D>,
-}
-
-impl<P: PublicIpGateway, D: DnsGateway> SyncRecords<P, D> {
-    pub fn new(public_ip_gateway: Arc<P>, dns_gateway: Arc<D>) -> Self {
-        Self {
-            check: CheckRecords::new(public_ip_gateway, dns_gateway.clone()),
-            dns_gateway,
-        }
-    }
-}
-
 impl<P: PublicIpGateway, D: DnsGateway> SyncRecordsUseCase for SyncRecords<P, D> {
     fn execute(&self, records: &[TrackedRecord]) -> Result<Report, PublicIpGatewayError> {
         let checked = self.check.execute(records)?;
@@ -42,7 +28,19 @@ impl<P: PublicIpGateway, D: DnsGateway> SyncRecordsUseCase for SyncRecords<P, D>
     }
 }
 
+pub struct SyncRecords<P: PublicIpGateway, D: DnsGateway> {
+    check: CheckRecords<P, D>,
+    dns_gateway: Arc<D>,
+}
+
 impl<P: PublicIpGateway, D: DnsGateway> SyncRecords<P, D> {
+    pub fn new(public_ip_gateway: Arc<P>, dns_gateway: Arc<D>) -> Self {
+        Self {
+            check: CheckRecords::new(public_ip_gateway, dns_gateway.clone()),
+            dns_gateway,
+        }
+    }
+
     fn sync(&self, checked: RecordOutcome, public_ip: PublicIp) -> RecordOutcome {
         let outcome = match checked.outcome {
             Outcome::Drifted { current } => self

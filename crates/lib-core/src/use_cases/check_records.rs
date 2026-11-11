@@ -13,6 +13,17 @@ pub trait CheckRecordsUseCase {
     fn execute(&self, records: &[TrackedRecord]) -> Result<Report, PublicIpGatewayError>;
 }
 
+impl<P: PublicIpGateway, D: DnsGateway> CheckRecordsUseCase for CheckRecords<P, D> {
+    fn execute(&self, records: &[TrackedRecord]) -> Result<Report, PublicIpGatewayError> {
+        let public_ip = self.public_ip_gateway.current_public_ip()?;
+        let records = records
+            .iter()
+            .map(|record| self.check(record, public_ip))
+            .collect();
+        Ok(Report { public_ip, records })
+    }
+}
+
 pub struct CheckRecords<P: PublicIpGateway, D: DnsGateway> {
     public_ip_gateway: Arc<P>,
     dns_gateway: Arc<D>,
@@ -25,20 +36,7 @@ impl<P: PublicIpGateway, D: DnsGateway> CheckRecords<P, D> {
             dns_gateway,
         }
     }
-}
 
-impl<P: PublicIpGateway, D: DnsGateway> CheckRecordsUseCase for CheckRecords<P, D> {
-    fn execute(&self, records: &[TrackedRecord]) -> Result<Report, PublicIpGatewayError> {
-        let public_ip = self.public_ip_gateway.current_public_ip()?;
-        let records = records
-            .iter()
-            .map(|record| self.check(record, public_ip))
-            .collect();
-        Ok(Report { public_ip, records })
-    }
-}
-
-impl<P: PublicIpGateway, D: DnsGateway> CheckRecords<P, D> {
     fn check(&self, record: &TrackedRecord, public_ip: PublicIp) -> RecordOutcome {
         let outcome = match self.dns_gateway.published(record) {
             Ok(current) => outcome_of(current, record, public_ip),
