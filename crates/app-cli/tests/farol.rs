@@ -13,27 +13,23 @@ use lib_core::use_cases::ports::{
 use lib_core_testing::{
     fakes::{FakeDnsGateway, FakePublicIpGateway},
     fixtures::{OLD_ADDRESS, PUBLIC_ADDRESS, nothing_pointed, public_ip, tracked},
-    scenario::Scenario,
 };
 
 const CHECK_HOME: &str = "check --provider hostinger --record example.com:home";
 
+#[derive(Default)]
 struct FakeInfrastructure {
-    scenario: Scenario,
+    public_ip_gateway: Arc<FakePublicIpGateway>,
+    dns_gateway: Arc<FakeDnsGateway>,
     provider_failure: Option<String>,
 }
 
 impl FakeInfrastructure {
-    fn new(scenario: &Scenario) -> Self {
+    fn publishing(dns_gateway: FakeDnsGateway) -> Self {
         Self {
-            scenario: scenario.clone(),
-            provider_failure: None,
+            dns_gateway: Arc::new(dns_gateway),
+            ..Self::default()
         }
-    }
-
-    fn failing_to_reach_the_provider(mut self, message: &str) -> Self {
-        self.provider_failure = Some(message.to_owned());
-        self
     }
 
     fn run(&self, arguments: &str) -> Result<Termination, clap::Error> {
@@ -47,21 +43,19 @@ impl Infrastructure for FakeInfrastructure {
     type DnsGateway = FakeDnsGateway;
 
     fn public_ip_gateway(&self) -> Arc<FakePublicIpGateway> {
-        self.scenario.public_ip_gateway()
+        Arc::clone(&self.public_ip_gateway)
     }
 
     fn dns_gateway(&self, _provider: Provider) -> Result<Arc<FakeDnsGateway>, String> {
         match &self.provider_failure {
             Some(message) => Err(message.clone()),
-            None => Ok(self.scenario.dns_gateway()),
+            None => Ok(Arc::clone(&self.dns_gateway)),
         }
     }
 }
 
-fn farol(scenario: &Scenario, arguments: &str) -> Termination {
-    FakeInfrastructure::new(scenario)
-        .run(arguments)
-        .expect("valid command line")
+fn farol(infrastructure: &FakeInfrastructure, arguments: &str) -> Termination {
+    infrastructure.run(arguments).expect("valid command line")
 }
 
 fn stopped(message: &str) -> Termination {
@@ -74,9 +68,11 @@ fn stopped(message: &str) -> Termination {
 
 #[test]
 fn should_check_an_unchanged_record_and_succeed() {
-    let scenario = Scenario::default().publishing("home", &[PUBLIC_ADDRESS]);
+    let infrastructure = FakeInfrastructure::publishing(
+        FakeDnsGateway::default().with_addresses("home", &[PUBLIC_ADDRESS]),
+    );
 
-    let termination = farol(&scenario, CHECK_HOME);
+    let termination = farol(&infrastructure, CHECK_HOME);
 
     let expected = Termination {
         success: true,
@@ -88,40 +84,49 @@ fn should_check_an_unchanged_record_and_succeed() {
 
 #[test]
 fn should_check_a_drifted_record_without_pointing_it() {
-    let scenario = Scenario::default().publishing("home", &[OLD_ADDRESS]);
+    let infrastructure = FakeInfrastructure::publishing(
+        FakeDnsGateway::default().with_addresses("home", &[OLD_ADDRESS]),
+    );
 
-    let termination = farol(&scenario, CHECK_HOME);
+    let termination = farol(&infrastructure, CHECK_HOME);
 
     let expected = "public IP 8.8.8.8\nhome.example.com: drifted (now 1.1.1.1, TTL 300)\n";
     assert_eq!(expected, termination.output);
     assert!(termination.success);
-    assert_eq!(nothing_pointed(), scenario.pointed());
+    assert_eq!(nothing_pointed(), infrastructure.dns_gateway.pointed());
 }
 
 #[test]
 fn should_sync_a_drifted_record_by_pointing_it() {
-    let scenario = Scenario::default().publishing("home", &[OLD_ADDRESS]);
+    let infrastructure = FakeInfrastructure::publishing(
+        FakeDnsGateway::default().with_addresses("home", &[OLD_ADDRESS]),
+    );
 
     let termination = farol(
-        &scenario,
+        &infrastructure,
         "sync --provider hostinger --record example.com:home",
     );
 
     let expected = "public IP 8.8.8.8\nhome.example.com: pointed (was 1.1.1.1, TTL 300)\n";
     assert_eq!(expected, termination.output);
     assert!(termination.success);
-    assert_eq!(vec![(tracked("home"), public_ip())], scenario.pointed());
+    assert_eq!(
+        vec![(tracked("home"), public_ip())],
+        infrastructure.dns_gateway.pointed()
+    );
 }
 
 #[test]
 fn should_report_every_record_but_fail_when_one_fails() {
     let error = DnsGatewayError::Unavailable("timeout".to_owned());
-    let scenario = Scenario::default()
-        .failing_to_read("home", error)
-        .publishing("lab", &[PUBLIC_ADDRESS]);
+    let infrastructure = FakeInfrastructure::publishing(
+        FakeDnsGateway::default()
+            .with_read_failure("home", error)
+            .with_addresses("lab", &[PUBLIC_ADDRESS]),
+    );
 
     let termination = farol(
-        &scenario,
+        &infrastructure,
         "check --provider hostinger --record example.com:home --record example.com:lab",
     );
 
@@ -135,9 +140,12 @@ fn should_report_every_record_but_fail_when_one_fails() {
 #[test]
 fn should_stop_when_the_public_ip_is_unavailable() {
     let error = PublicIpGatewayError::Unavailable("offline".to_owned());
-    let scenario = Scenario::default().without_public_ip(error);
+    let infrastructure = FakeInfrastructure {
+        public_ip_gateway: Arc::new(FakePublicIpGateway(Err(error))),
+        ..FakeInfrastructure::default()
+    };
 
-    let termination = farol(&scenario, CHECK_HOME);
+    let termination = farol(&infrastructure, CHECK_HOME);
 
     let message = "could not find the public IP: the public IP service is unavailable (offline)";
     assert_eq!(stopped(message), termination);
@@ -146,7 +154,7 @@ fn should_stop_when_the_public_ip_is_unavailable() {
 #[test]
 fn should_stop_on_an_invalid_record_argument() {
     let termination = farol(
-        &Scenario::default(),
+        &FakeInfrastructure::default(),
         "check --provider hostinger --record example.com",
     );
 
@@ -157,17 +165,19 @@ fn should_stop_on_an_invalid_record_argument() {
 
 #[test]
 fn should_stop_when_the_dns_provider_cannot_be_reached() {
-    let infrastructure =
-        FakeInfrastructure::new(&Scenario::default()).failing_to_reach_the_provider("no token");
+    let infrastructure = FakeInfrastructure {
+        provider_failure: Some("no token".to_owned()),
+        ..FakeInfrastructure::default()
+    };
 
-    let termination = infrastructure.run(CHECK_HOME).expect("valid command line");
+    let termination = farol(&infrastructure, CHECK_HOME);
 
     assert_eq!(stopped("no token"), termination);
 }
 
 #[test]
 fn should_refuse_a_command_line_without_records() {
-    let infrastructure = FakeInfrastructure::new(&Scenario::default());
+    let infrastructure = FakeInfrastructure::default();
 
     let error = infrastructure
         .run("check --provider hostinger")
