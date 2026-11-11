@@ -132,7 +132,7 @@ A new DNS provider is a new slice crate that implements `DnsGateway`.
 
 ```
 farol/
-├── .github/workflows/ci.yml          # CI: fmt, clippy, tests, coverage
+├── .github/workflows/ci.yml          # CI: fmt, clippy, tests
 ├── contrib/systemd/                  # hardened service and five-minute timer
 │   ├── farol.service
 │   └── farol.timer
