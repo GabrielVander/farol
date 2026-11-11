@@ -3,7 +3,7 @@ use std::net::Ipv4Addr;
 use lib_core::{
     entities::tracked_record::TrackedRecord,
     use_cases::{
-        dns_gateway::DnsGatewayError,
+        dns_gateway::{DnsGatewayError, PublishedRecord},
         public_ip_gateway::PublicIpGatewayError,
         report::{Outcome, RecordOutcome, Report},
     },
@@ -53,8 +53,8 @@ fn record_line(record_outcome: &RecordOutcome) -> String {
 fn describe(outcome: &Outcome) -> String {
     match outcome {
         Outcome::Unchanged => "unchanged".to_owned(),
-        Outcome::Drifted { addresses } => format!("drifted (now {})", list(addresses)),
-        Outcome::Pointed { previous } => format!("pointed (was {})", list(previous)),
+        Outcome::Drifted { current } => format!("drifted (now {})", summary(current)),
+        Outcome::Pointed { previous } => format!("pointed (was {})", summary(previous)),
         Outcome::Failed(error) => format!("failed, {}", explain(error)),
     }
 }
@@ -85,6 +85,14 @@ fn detail(error: &DnsGatewayError) -> &str {
     }
 }
 
+fn summary(published: &PublishedRecord) -> String {
+    let addresses = list(&published.addresses);
+    match published.ttl {
+        Some(ttl) => format!("{addresses}, TTL {ttl}"),
+        None => addresses,
+    }
+}
+
 fn list(addresses: &[Ipv4Addr]) -> String {
     if addresses.is_empty() {
         return "no A record".to_owned();
@@ -110,7 +118,7 @@ mod test {
             tracked_record::TrackedRecord, ttl::Ttl,
         },
         use_cases::{
-            dns_gateway::DnsGatewayError,
+            dns_gateway::{DnsGatewayError, PublishedRecord},
             public_ip_gateway::PublicIpGatewayError,
             report::{Outcome, RecordOutcome, Report},
         },
@@ -120,6 +128,13 @@ mod test {
 
     fn public_ip() -> PublicIp {
         PublicIp::try_from(Ipv4Addr::new(8, 8, 8, 8)).expect("public ip")
+    }
+
+    fn published(addresses: Vec<Ipv4Addr>) -> PublishedRecord {
+        PublishedRecord {
+            addresses,
+            ttl: None,
+        }
     }
 
     fn report_with(name: &str, outcome: Outcome) -> Report {
@@ -174,11 +189,21 @@ mod test {
 
         assert_eq!(
             "home.example.com: drifted (now 1.1.1.1, 2.2.2.2)",
-            record_line(&report_with("home", Outcome::Drifted { addresses }))
+            record_line(&report_with(
+                "home",
+                Outcome::Drifted {
+                    current: published(addresses)
+                }
+            ))
         );
         assert_eq!(
             "home.example.com: drifted (now no A record)",
-            record_line(&report_with("home", Outcome::Drifted { addresses: vec![] }))
+            record_line(&report_with(
+                "home",
+                Outcome::Drifted {
+                    current: published(vec![])
+                }
+            ))
         );
     }
 
@@ -188,6 +213,37 @@ mod test {
 
         assert_eq!(
             "home.example.com: pointed (was 1.1.1.1)",
+            record_line(&report_with(
+                "home",
+                Outcome::Pointed {
+                    previous: published(previous)
+                }
+            ))
+        );
+    }
+
+    #[test]
+    fn should_render_the_ttl_of_a_drifted_record() {
+        let current = PublishedRecord {
+            addresses: vec![Ipv4Addr::new(1, 1, 1, 1)],
+            ttl: Some(3600),
+        };
+
+        assert_eq!(
+            "home.example.com: drifted (now 1.1.1.1, TTL 3600)",
+            record_line(&report_with("home", Outcome::Drifted { current }))
+        );
+    }
+
+    #[test]
+    fn should_render_the_previous_ttl_of_a_pointed_record() {
+        let previous = PublishedRecord {
+            addresses: vec![Ipv4Addr::new(1, 1, 1, 1)],
+            ttl: Some(3600),
+        };
+
+        assert_eq!(
+            "home.example.com: pointed (was 1.1.1.1, TTL 3600)",
             record_line(&report_with("home", Outcome::Pointed { previous }))
         );
     }
@@ -232,7 +288,12 @@ mod test {
 
     #[test]
     fn should_have_no_failures_when_every_record_succeeded() {
-        let report = report_with("home", Outcome::Pointed { previous: vec![] });
+        let report = report_with(
+            "home",
+            Outcome::Pointed {
+                previous: published(vec![]),
+            },
+        );
 
         assert!(!has_failures(&report));
     }

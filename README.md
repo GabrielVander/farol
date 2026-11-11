@@ -12,11 +12,22 @@ It runs once and exits. Schedule it with a systemd timer or cron.
 
 ## Install
 
+Straight from the repository, without cloning it first:
+
 ```sh
-cargo install --path crates/app-cli
+cargo install --locked --git https://github.com/GabrielVander/farol app-cli
 ```
 
-This installs the `farol` binary into `~/.cargo/bin`.
+Add `--tag <tag>` or `--rev <commit>` to pin a version instead of taking the
+latest `main`. Run the same command with `--force` to upgrade.
+
+Or from a local clone:
+
+```sh
+cargo install --locked --path crates/app-cli
+```
+
+Either way, this installs the `farol` binary into `~/.cargo/bin`.
 
 ## Configure
 
@@ -39,17 +50,18 @@ farol sync --provider hostinger --record example.com:home    # point drifted rec
 |--------|---------|
 | `--provider` | The DNS provider. Required. `hostinger` is the only one so far. |
 | `--record DOMAIN:NAME` | A record to keep pointed at this machine. Required and repeatable. Use `@` as the name for the domain itself, and `*` or `*.home` for a wildcard. Quote wildcards so the shell leaves them alone: `--record 'example.com:*'`. |
-| `--ttl SECONDS` | The TTL of every record farol points. Defaults to 300. |
+| `--ttl SECONDS` | The TTL every tracked record should have. Defaults to 300, so a record with any other TTL counts as drifted unless you pass its value here. |
 
 ```
 $ farol sync --provider hostinger --record example.com:@ --record example.com:home
 public IP 203.0.113.7
 example.com: unchanged
-home.example.com: pointed (was 198.51.100.4)
+home.example.com: pointed (was 198.51.100.4, TTL 300)
 ```
 
 A record has **drifted** when its A records are anything other than exactly
-the public IP: missing, different, or several. Pointing a record replaces all
+the public IP (missing, different, or several) or its TTL differs from
+`--ttl`. Pointing a record replaces all
 of its A records with a single one holding the public IP and the `--ttl` value.
 Other record types and other names are left alone.
 
@@ -91,12 +103,13 @@ once per run, so a five-minute schedule stays far below that limit.
 ### Or with cron
 
 ```cron
-*/5 * * * * FAROL_HOSTINGER_TOKEN=... /usr/local/bin/farol sync --provider hostinger --record example.com:home
+FAROL_HOSTINGER_TOKEN=...
+*/5 * * * * /usr/local/bin/farol sync --provider hostinger --record example.com:home
 ```
 
 ## Development
 
-farol uses stable Rust, pinned in `rust-toolchain.toml`. See
+farol tracks stable Rust through `rust-toolchain.toml`. See
 [`CLAUDE.md`](CLAUDE.md) for the engineering rules: Clean Architecture with
 vertical slices, lightweight DDD, Clean Code and Canon TDD.
 

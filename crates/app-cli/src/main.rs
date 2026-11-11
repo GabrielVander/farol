@@ -22,6 +22,7 @@ use lib_ipify::infrastructure::{
 const IPIFY_URL: &str = "https://api.ipify.org";
 const IPIFY_TIMEOUT: Duration = Duration::from_secs(10);
 const HOSTINGER_URL: &str = "https://developers.hostinger.com";
+const HOSTINGER_TIMEOUT: Duration = Duration::from_secs(30);
 
 type PublicIpGateway = IpifyPublicIpGateway<UreqIpifyApi>;
 type DnsGateway = HostingerDnsGateway<UreqHostingerApi>;
@@ -70,7 +71,7 @@ enum Provider {
 
 fn main() -> ExitCode {
     let cli = Cli::parse();
-    match run(cli.command) {
+    match run(&cli.command) {
         Ok(report) => print_report(&report),
         Err(message) => {
             eprintln!("farol: {message}");
@@ -79,7 +80,7 @@ fn main() -> ExitCode {
     }
 }
 
-fn run(command: Command) -> Result<Report, String> {
+fn run(command: &Command) -> Result<Report, String> {
     let options = command.options();
     let records = tracked_records(&options.records, options.ttl)
         .map_err(|error| explain_record_argument_error(&error))?;
@@ -94,9 +95,10 @@ fn run(command: Command) -> Result<Report, String> {
 
 fn print_report(report: &Report) -> ExitCode {
     print!("{}", render(report));
-    match has_failures(report) {
-        true => ExitCode::FAILURE,
-        false => ExitCode::SUCCESS,
+    if has_failures(report) {
+        ExitCode::FAILURE
+    } else {
+        ExitCode::SUCCESS
     }
 }
 
@@ -105,7 +107,7 @@ fn dns_gateway(provider: Provider) -> Result<DnsGateway, String> {
         Provider::Hostinger => {
             let token = hostinger_token(environment)
                 .map_err(|_| format!("set {HOSTINGER_TOKEN_VARIABLE} to a Hostinger API token"))?;
-            let api = UreqHostingerApi::new(HOSTINGER_URL.to_owned(), token);
+            let api = UreqHostingerApi::new(HOSTINGER_URL.to_owned(), token, HOSTINGER_TIMEOUT);
             Ok(HostingerDnsGateway::new(api))
         }
     }
@@ -117,4 +119,16 @@ fn public_ip_gateway() -> PublicIpGateway {
 
 fn environment(key: &str) -> Option<String> {
     env::var(key).ok()
+}
+
+#[cfg(test)]
+mod test {
+    use clap::CommandFactory;
+
+    use crate::Cli;
+
+    #[test]
+    fn should_define_a_valid_command_line() {
+        Cli::command().debug_assert();
+    }
 }

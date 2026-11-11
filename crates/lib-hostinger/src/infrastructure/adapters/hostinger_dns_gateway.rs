@@ -6,7 +6,7 @@ use std::{
 
 use lib_core::{
     entities::{public_ip::PublicIp, tracked_record::TrackedRecord},
-    use_cases::dns_gateway::{DnsGateway, DnsGatewayError},
+    use_cases::dns_gateway::{DnsGateway, DnsGatewayError, PublishedRecord},
 };
 
 use crate::infrastructure::{
@@ -44,9 +44,12 @@ impl<A: HostingerApi> HostingerDnsGateway<A> {
 }
 
 impl<A: HostingerApi> DnsGateway for HostingerDnsGateway<A> {
-    fn addresses_of(&self, record: &TrackedRecord) -> Result<Vec<Ipv4Addr>, DnsGatewayError> {
+    fn published(&self, record: &TrackedRecord) -> Result<PublishedRecord, DnsGatewayError> {
         let record_sets = self.zone(record.domain.as_str())?;
-        addresses_in(&record_sets, record)
+        Ok(PublishedRecord {
+            addresses: addresses_in(&record_sets, record)?,
+            ttl: ttl_in(&record_sets, record),
+        })
     }
 
     fn point(&self, record: &TrackedRecord, public_ip: PublicIp) -> Result<(), DnsGatewayError> {
@@ -71,6 +74,14 @@ fn addresses_in(
         .filter(|value| !value.is_disabled)
         .map(parse_address)
         .collect()
+}
+
+fn ttl_in(record_sets: &[RecordSet], record: &TrackedRecord) -> Option<u32> {
+    record_sets
+        .iter()
+        .filter(|record_set| holds_addresses_of(record_set, record))
+        .find(|record_set| record_set.records.iter().any(|value| !value.is_disabled))
+        .map(|record_set| record_set.ttl)
 }
 
 fn holds_addresses_of(record_set: &RecordSet, record: &TrackedRecord) -> bool {
@@ -124,7 +135,7 @@ fn detail(message: String, correlation_id: Option<String>) -> String {
 
 fn error_for_status(status: u16) -> fn(String) -> DnsGatewayError {
     match status {
-        401 => DnsGatewayError::Unauthorized,
+        401 | 403 => DnsGatewayError::Unauthorized,
         404 => DnsGatewayError::DomainNotFound,
         422 => DnsGatewayError::Rejected,
         429 => DnsGatewayError::RateLimited,
@@ -232,7 +243,7 @@ mod test {
     fn reading_error(error: HostingerApiError) -> DnsGatewayError {
         let gateway = HostingerDnsGateway::new(FakeHostingerApi::failing_with(error));
         gateway
-            .addresses_of(&tracked("home"))
+            .published(&tracked("home"))
             .expect_err("reading should fail")
     }
 
@@ -250,9 +261,47 @@ mod test {
             .with_zone("example.com", vec![record_set("home", "A", &["8.8.8.8"])]);
         let gateway = HostingerDnsGateway::new(api);
 
-        let addresses = gateway.addresses_of(&tracked("home")).expect("addresses");
+        let addresses = gateway
+            .published(&tracked("home"))
+            .expect("published")
+            .addresses;
 
         assert_eq!(vec![Ipv4Addr::new(8, 8, 8, 8)], addresses);
+    }
+
+    #[test]
+    fn should_read_the_ttl_of_a_matching_a_record() {
+        let mut home = record_set("home", "A", &["8.8.8.8"]);
+        home.ttl = 3600;
+        let api = FakeHostingerApi::default().with_zone("example.com", vec![home]);
+        let gateway = HostingerDnsGateway::new(api);
+
+        let ttl = gateway.published(&tracked("home")).expect("published").ttl;
+
+        assert_eq!(Some(3600), ttl);
+    }
+
+    #[test]
+    fn should_find_no_ttl_for_a_record_missing_from_the_zone() {
+        let api = FakeHostingerApi::default()
+            .with_zone("example.com", vec![record_set("lab", "A", &["8.8.8.8"])]);
+        let gateway = HostingerDnsGateway::new(api);
+
+        let ttl = gateway.published(&tracked("home")).expect("published").ttl;
+
+        assert_eq!(None, ttl);
+    }
+
+    #[test]
+    fn should_find_no_ttl_for_a_record_with_only_disabled_values() {
+        let mut home = record_set("home", "A", &["8.8.8.8"]);
+        home.records[0].is_disabled = true;
+        let api = FakeHostingerApi::default().with_zone("example.com", vec![home]);
+        let gateway = HostingerDnsGateway::new(api);
+
+        let ttl = gateway.published(&tracked("home")).expect("published").ttl;
+
+        assert_eq!(None, ttl);
     }
 
     #[test]
@@ -281,7 +330,10 @@ mod test {
         let api = FakeHostingerApi::default().with_zone("example.com", zone);
         let gateway = HostingerDnsGateway::new(api);
 
-        let addresses = gateway.addresses_of(&tracked("*")).expect("addresses");
+        let addresses = gateway
+            .published(&tracked("*"))
+            .expect("published")
+            .addresses;
 
         assert_eq!(vec![Ipv4Addr::new(8, 8, 8, 8)], addresses);
     }
@@ -316,7 +368,10 @@ mod test {
         );
         let gateway = HostingerDnsGateway::new(api);
 
-        let addresses = gateway.addresses_of(&tracked("home")).expect("addresses");
+        let addresses = gateway
+            .published(&tracked("home"))
+            .expect("published")
+            .addresses;
 
         assert_eq!(vec![Ipv4Addr::new(8, 8, 8, 8)], addresses);
     }
@@ -328,7 +383,10 @@ mod test {
         let api = FakeHostingerApi::default().with_zone("example.com", vec![home]);
         let gateway = HostingerDnsGateway::new(api);
 
-        let addresses = gateway.addresses_of(&tracked("home")).expect("addresses");
+        let addresses = gateway
+            .published(&tracked("home"))
+            .expect("published")
+            .addresses;
 
         assert_eq!(vec![Ipv4Addr::new(8, 8, 8, 8)], addresses);
     }
@@ -339,7 +397,10 @@ mod test {
             .with_zone("example.com", vec![record_set("lab", "A", &["8.8.8.8"])]);
         let gateway = HostingerDnsGateway::new(api);
 
-        let addresses = gateway.addresses_of(&tracked("home")).expect("addresses");
+        let addresses = gateway
+            .published(&tracked("home"))
+            .expect("published")
+            .addresses;
 
         assert!(addresses.is_empty());
     }
@@ -352,7 +413,9 @@ mod test {
 
         assert_eq!(
             Err(DnsGatewayError::InvalidAnswer("not-an-ip".to_owned())),
-            gateway.addresses_of(&tracked("home"))
+            gateway
+                .published(&tracked("home"))
+                .map(|published| published.addresses)
         );
     }
 
@@ -367,8 +430,8 @@ mod test {
         );
         let gateway = HostingerDnsGateway::new(api);
 
-        gateway.addresses_of(&tracked("@")).expect("addresses");
-        gateway.addresses_of(&tracked("home")).expect("addresses");
+        gateway.published(&tracked("@")).expect("published");
+        gateway.published(&tracked("home")).expect("published");
 
         assert_eq!(1, gateway.api.zone_reads());
     }
@@ -380,9 +443,9 @@ mod test {
         let gateway = HostingerDnsGateway::new(api);
         let public_ip = PublicIp::try_from(Ipv4Addr::new(8, 8, 8, 8)).expect("public ip");
 
-        gateway.addresses_of(&tracked("home")).expect("addresses");
+        gateway.published(&tracked("home")).expect("published");
         gateway.point(&tracked("home"), public_ip).expect("pointed");
-        gateway.addresses_of(&tracked("home")).expect("addresses");
+        gateway.published(&tracked("home")).expect("published");
 
         assert_eq!(2, gateway.api.zone_reads());
     }
@@ -392,6 +455,14 @@ mod test {
         assert_eq!(
             DnsGatewayError::Unauthorized("Unauthenticated.".to_owned()),
             reading_error(status(401, "Unauthenticated."))
+        );
+    }
+
+    #[test]
+    fn should_report_403_as_unauthorized() {
+        assert_eq!(
+            DnsGatewayError::Unauthorized("Forbidden.".to_owned()),
+            reading_error(status(403, "Forbidden."))
         );
     }
 

@@ -45,12 +45,10 @@ impl<P: PublicIpGateway, D: DnsGateway> SyncRecordsUseCase for SyncRecords<P, D>
 impl<P: PublicIpGateway, D: DnsGateway> SyncRecords<P, D> {
     fn sync(&self, checked: RecordOutcome, public_ip: PublicIp) -> RecordOutcome {
         let outcome = match checked.outcome {
-            Outcome::Drifted { addresses } => self
+            Outcome::Drifted { current } => self
                 .dns_gateway
                 .point(&checked.record, public_ip)
-                .map_or_else(Outcome::Failed, |()| Outcome::Pointed {
-                    previous: addresses,
-                }),
+                .map_or_else(Outcome::Failed, |()| Outcome::Pointed { previous: current }),
             other => other,
         };
         RecordOutcome {
@@ -65,12 +63,13 @@ mod test {
     use std::sync::Arc;
 
     use crate::use_cases::{
-        dns_gateway::DnsGatewayError,
+        dns_gateway::{DnsGatewayError, PublishedRecord},
         public_ip_gateway::PublicIpGatewayError,
         report::{Outcome, RecordOutcome},
         sync_records::{SyncRecords, SyncRecordsUseCase},
         test_support::{
-            FakeDnsGateway, FakePublicIpGateway, OLD_ADDRESS, PUBLIC_ADDRESS, public_ip, tracked,
+            FakeDnsGateway, FakePublicIpGateway, OLD_ADDRESS, PUBLIC_ADDRESS, public_ip, published,
+            tracked,
         },
     };
 
@@ -107,8 +106,31 @@ mod test {
         let expected = RecordOutcome {
             record: tracked("home"),
             outcome: Outcome::Pointed {
-                previous: vec![OLD_ADDRESS],
+                previous: published(&[OLD_ADDRESS]),
             },
+        };
+        assert_eq!(vec![expected], report.records);
+        assert_eq!(vec![(tracked("home"), public_ip())], dns_gateway.pointed());
+    }
+
+    #[test]
+    fn should_point_a_record_that_drifted_only_in_ttl() {
+        let current = PublishedRecord {
+            addresses: vec![PUBLIC_ADDRESS],
+            ttl: Some(3600),
+        };
+        let dns_gateway =
+            Arc::new(FakeDnsGateway::default().with_published("home", current.clone()));
+        let sync = SyncRecords::new(
+            Arc::new(FakePublicIpGateway(Ok(public_ip()))),
+            dns_gateway.clone(),
+        );
+
+        let report = sync.execute(&[tracked("home")]).expect("report");
+
+        let expected = RecordOutcome {
+            record: tracked("home"),
+            outcome: Outcome::Pointed { previous: current },
         };
         assert_eq!(vec![expected], report.records);
         assert_eq!(vec![(tracked("home"), public_ip())], dns_gateway.pointed());
@@ -138,7 +160,7 @@ mod test {
             RecordOutcome {
                 record: tracked("lab"),
                 outcome: Outcome::Pointed {
-                    previous: vec![OLD_ADDRESS],
+                    previous: published(&[OLD_ADDRESS]),
                 },
             },
         ];

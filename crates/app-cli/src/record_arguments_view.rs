@@ -58,7 +58,7 @@ mod test {
             ),
             (
                 RecordArgumentError::InvalidDomain {
-                    domain: "".to_owned(),
+                    domain: String::new(),
                     reason: DomainNameError::Empty,
                 },
                 "invalid domain \"\": it is empty",
