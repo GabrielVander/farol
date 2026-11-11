@@ -13,7 +13,8 @@ use crate::{
 };
 
 pub trait WatchRecordsUseCase {
-    /// Runs one round of the watch. `None` means nothing needed syncing.
+    /// Runs one round of the watch: syncs `records` unless the public IP is the
+    /// one the last round synced without failures, which gives `None`.
     fn execute(
         &mut self,
         records: &[TrackedRecord],

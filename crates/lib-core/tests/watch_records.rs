@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use lib_core::use_cases::{
-    ports::dns_gateway::DnsGatewayError,
+    ports::{dns_gateway::DnsGatewayError, public_ip_gateway::PublicIpGatewayError},
     report::{Outcome, RecordOutcome, Report},
     watch_records::{WatchRecords, WatchRecordsUseCase},
 };
@@ -99,4 +99,28 @@ fn should_retry_a_round_that_had_a_failed_record() {
         }],
     };
     assert_eq!(Ok(Some(expected)), report);
+}
+
+#[test]
+fn should_fail_a_round_without_the_public_ip_and_keep_the_last_synced_one() {
+    let error = PublicIpGatewayError::Unavailable("offline".to_owned());
+    let dns_gateway = Arc::new(FakeDnsGateway::default().with_addresses("home", &[OLD_ADDRESS]));
+    let mut watch_records = WatchRecords::new(
+        Arc::new(FakePublicIpGateway::answering(vec![
+            Ok(public_ip()),
+            Err(error.clone()),
+            Ok(public_ip()),
+        ])),
+        Arc::clone(&dns_gateway),
+    );
+    watch_records
+        .execute(&[tracked("home")])
+        .expect("first round");
+
+    let failed = watch_records.execute(&[tracked("home")]);
+    let recovered = watch_records.execute(&[tracked("home")]);
+
+    assert_eq!(Err(error), failed);
+    assert_eq!(Ok(None), recovered);
+    assert_eq!(vec![(tracked("home"), public_ip())], dns_gateway.pointed());
 }
