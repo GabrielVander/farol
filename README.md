@@ -192,29 +192,38 @@ A new DNS provider is a new slice crate that implements `DnsGateway`.
 **Components.** The third C4 level: the crates inside the `farol` binary.
 Every arrow points inward, toward `lib-core`. The core defines the gateway
 traits, the slice crates implement them, and only `app-cli` knows about all of
-them. Dashed arrows are test-only dependencies.
+them.
 
 ```mermaid
 flowchart LR
-    cli["app-cli<br/>(farol binary)"]
-    core["lib-core<br/>entities, use cases,<br/>gateway traits"]
-    ipify["lib-ipify"]
-    hostinger["lib-hostinger"]
-    testing["lib-core-testing<br/>fakes, fixtures"]
-    ipifyApi(["ipify API"])
-    hostingerApi(["Hostinger DNS API"])
+    subgraph binary["farol [Container: Rust binary]"]
+        cli["<b>app-cli</b><br/>[Component: crate]<br/>The farol command: arguments,<br/>output and wiring"]
+        core["<b>lib-core</b><br/>[Component: crate]<br/>Entities, use cases (check, sync)<br/>and gateway traits"]
+        ipify["<b>lib-ipify</b><br/>[Component: crate]<br/>Finds the public IP"]
+        hostinger["<b>lib-hostinger</b><br/>[Component: crate]<br/>Reads and points A records"]
+    end
 
-    cli -- "runs check / sync" --> core
-    cli -- "wires in" --> ipify
-    cli -- "wires in" --> hostinger
-    ipify -- "implements PublicIpGateway" --> core
-    hostinger -- "implements DnsGateway" --> core
-    testing -- "fakes the gateways" --> core
-    core -.-> testing
-    cli -.-> testing
-    ipify -- "HTTPS (ureq)" --> ipifyApi
-    hostinger -- "HTTPS (ureq)" --> hostingerApi
+    ipifyApi["<b>ipify</b><br/>[External System]"]
+    hostingerApi["<b>Hostinger DNS API</b><br/>[External System]"]
+
+    cli -- "Runs check / sync" --> core
+    cli -- "Wires in" --> ipify
+    cli -- "Wires in" --> hostinger
+    ipify -- "Implements PublicIpGateway" --> core
+    hostinger -- "Implements DnsGateway" --> core
+    ipify -- "GET public IP<br/>[HTTPS, ureq]" --> ipifyApi
+    hostinger -- "GET zone, PUT A records<br/>[HTTPS + Bearer token, ureq]" --> hostingerApi
+
+    classDef component fill:#85bbf0,stroke:#5d82a8,color:#000
+    classDef external fill:#999,stroke:#6b6b6b,color:#fff
+    class cli,core,ipify,hostinger component
+    class ipifyApi,hostingerApi external
+    style binary fill:none,stroke:#888,stroke-dasharray:5 5
 ```
+
+`lib-core-testing` isn't in the diagram because it isn't in the binary. It
+holds the fakes and fixtures the tests share, and only `lib-core` and `app-cli`
+depend on it, as a dev-dependency.
 
 ### Project layout
 
