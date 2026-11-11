@@ -1,9 +1,9 @@
 use std::{env, process::ExitCode, sync::Arc, time::Duration};
 
 use app_cli::{
-    adapters::controllers::run::{Infrastructure, run},
+    adapters::controllers::records_controller::{Infrastructure, Provider},
     infrastructure::{
-        command_line::Provider,
+        run::run,
         token::{HOSTINGER_TOKEN_VARIABLE, hostinger_token},
     },
 };
