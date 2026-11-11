@@ -23,7 +23,6 @@ pub trait Infrastructure {
 
     fn public_ip_gateway(&self) -> Arc<Self::PublicIpGateway>;
 
-    /// The gateway to `provider`, or why it cannot be reached.
     fn dns_gateway(&self, provider: Provider) -> Result<Arc<Self::DnsGateway>, String>;
 }
 
@@ -47,7 +46,6 @@ pub enum Provider {
     Hostinger,
 }
 
-/// How a run ended: what it printed and whether it succeeded.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Termination {
     pub success: bool,
@@ -73,7 +71,6 @@ impl Termination {
     }
 }
 
-/// Carries out `request` against `infrastructure` and says how it ended.
 pub fn handle(request: &RecordsRequest, infrastructure: &impl Infrastructure) -> Termination {
     match execute(request, infrastructure) {
         Ok(report) => Termination::reported(&report),

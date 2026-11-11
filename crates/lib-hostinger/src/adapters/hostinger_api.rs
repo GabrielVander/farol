@@ -1,6 +1,5 @@
 use crate::adapters::models::{RecordSet, UpdateZoneRequest};
 
-/// The parts of Hostinger's DNS API that farol uses.
 pub trait HostingerApi {
     fn zone(&self, domain: &str) -> Result<Vec<RecordSet>, HostingerApiError>;
 

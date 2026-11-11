@@ -32,7 +32,6 @@ fn main() -> ExitCode {
     }
 }
 
-/// The real services farol talks to.
 struct Internet;
 
 impl Infrastructure for Internet {

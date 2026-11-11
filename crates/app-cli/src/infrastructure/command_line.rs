@@ -11,7 +11,6 @@ pub struct Cli {
 }
 
 impl Cli {
-    /// The request this command line makes of the controller.
     pub fn into_request(self) -> RecordsRequest {
         let (action, options) = match self.command {
             Command::Check(options) => (Action::Check, options),

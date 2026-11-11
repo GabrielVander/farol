@@ -4,7 +4,6 @@ use ureq::Agent;
 
 use crate::adapters::ipify_api::{IpifyApi, IpifyApiError};
 
-/// Asks ipify over HTTP, giving up after `timeout`.
 pub struct UreqIpifyApi {
     url: String,
     agent: Agent,

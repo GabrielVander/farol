@@ -9,8 +9,6 @@ use crate::adapters::{
 
 const ZONES_PATH: &str = "/api/dns/v1/zones/";
 
-/// Talks to Hostinger's DNS API at `base_url`, authenticated by an API token,
-/// giving up after `timeout`.
 pub struct UreqHostingerApi {
     base_url: String,
     token: String,

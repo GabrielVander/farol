@@ -24,7 +24,6 @@ pub struct UpdateZoneRequest {
     pub zone: Vec<RecordSet>,
 }
 
-/// The body Hostinger sends with an error status.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 pub struct ErrorBody {
     pub message: String,
