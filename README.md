@@ -128,6 +128,53 @@ cargo llvm-cov --workspace
 
 A new DNS provider is a new slice crate that implements `DnsGateway`.
 
+### Project layout
+
+```
+farol/
+├── .github/workflows/ci.yml          # CI: fmt, clippy, tests, coverage
+├── contrib/systemd/                  # hardened service and five-minute timer
+│   ├── farol.service
+│   └── farol.timer
+├── crates/
+│   ├── lib-core/                     # the domain: no I/O, no third-party APIs
+│   │   ├── src/
+│   │   │   ├── entities/             # domain_name, label, public_ip, record_name, tracked_record, ttl
+│   │   │   ├── use_cases/
+│   │   │   │   ├── ports/            # dns_gateway, public_ip_gateway
+│   │   │   │   ├── check_records.rs
+│   │   │   │   ├── sync_records.rs
+│   │   │   │   └── report.rs
+│   │   │   ├── entities.rs
+│   │   │   ├── use_cases.rs
+│   │   │   └── lib.rs
+│   │   └── tests/                    # check_records, sync_records
+│   ├── lib-core-testing/             # fakes and fixtures shared by the tests
+│   │   └── src/                      # fakes, fixtures, lib
+│   ├── lib-ipify/                    # PublicIpGateway through ipify
+│   │   └── src/
+│   │       ├── adapters/             # ipify_api, ipify_public_ip_gateway
+│   │       └── infrastructure/       # ureq_ipify_api
+│   ├── lib-hostinger/                # DnsGateway through Hostinger's DNS API
+│   │   └── src/
+│   │       ├── adapters/             # hostinger_api, hostinger_dns_gateway, models
+│   │       └── infrastructure/       # ureq_hostinger_api
+│   └── app-cli/                      # the `farol` binary
+│       ├── src/
+│       │   ├── adapters/
+│       │   │   ├── controllers/      # record_arguments, records_controller
+│       │   │   └── presenters/       # record_arguments_view, report_view
+│       │   ├── infrastructure/       # command_line, run, token
+│       │   ├── lib.rs
+│       │   └── main.rs
+│       └── tests/farol.rs            # end-to-end tests of the binary
+├── Cargo.toml                        # workspace
+├── rust-toolchain.toml
+├── CLAUDE.md
+├── LICENSE
+└── README.md
+```
+
 ## Licence
 
 MIT
