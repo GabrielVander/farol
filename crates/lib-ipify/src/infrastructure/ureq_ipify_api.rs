@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use ureq::Agent;
 
-use crate::infrastructure::adapters::ipify_api::{IpifyApi, IpifyApiError};
+use crate::adapters::ipify_api::{IpifyApi, IpifyApiError};
 
 /// Asks ipify over HTTP, giving up after `timeout`.
 pub struct UreqIpifyApi {
@@ -41,9 +41,9 @@ mod test {
         time::{Duration, Instant},
     };
 
-    use crate::infrastructure::{
+    use crate::{
         adapters::ipify_api::{IpifyApi, IpifyApiError},
-        ureq_ipify_api::UreqIpifyApi,
+        infrastructure::ureq_ipify_api::UreqIpifyApi,
     };
 
     const TIMEOUT: Duration = Duration::from_secs(2);

@@ -5,7 +5,7 @@ use lib_core::{
     use_cases::public_ip_gateway::{PublicIpGateway, PublicIpGatewayError},
 };
 
-use crate::infrastructure::adapters::ipify_api::{IpifyApi, IpifyApiError};
+use crate::adapters::ipify_api::{IpifyApi, IpifyApiError};
 
 pub struct IpifyPublicIpGateway<A: IpifyApi> {
     api: A,
@@ -46,7 +46,7 @@ mod test {
 
     use lib_core::use_cases::public_ip_gateway::{PublicIpGateway, PublicIpGatewayError};
 
-    use crate::infrastructure::adapters::{
+    use crate::adapters::{
         ipify_api::{IpifyApi, IpifyApiError},
         ipify_public_ip_gateway::IpifyPublicIpGateway,
     };

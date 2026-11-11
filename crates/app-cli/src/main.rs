@@ -9,8 +9,9 @@ use lib_hostinger::{
     adapters::hostinger_dns_gateway::HostingerDnsGateway,
     infrastructure::ureq_hostinger_api::UreqHostingerApi,
 };
-use lib_ipify::infrastructure::{
-    adapters::ipify_public_ip_gateway::IpifyPublicIpGateway, ureq_ipify_api::UreqIpifyApi,
+use lib_ipify::{
+    adapters::ipify_public_ip_gateway::IpifyPublicIpGateway,
+    infrastructure::ureq_ipify_api::UreqIpifyApi,
 };
 
 const IPIFY_URL: &str = "https://api.ipify.org";
