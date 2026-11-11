@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use app_cli::{
-    adapters::controllers::records_controller::{Infrastructure, Provider, Termination},
+    adapters::controllers::records_controller::{Infrastructure, Provider, Response},
     infrastructure::run::run,
 };
 use clap::error::ErrorKind;
@@ -32,7 +32,7 @@ impl FakeInfrastructure {
         }
     }
 
-    fn run(&self, arguments: &str) -> Result<Termination, clap::Error> {
+    fn run(&self, arguments: &str) -> Result<Response, clap::Error> {
         let arguments = ["farol"].into_iter().chain(arguments.split_whitespace());
         run(arguments, self)
     }
@@ -54,12 +54,12 @@ impl Infrastructure for FakeInfrastructure {
     }
 }
 
-fn farol(infrastructure: &FakeInfrastructure, arguments: &str) -> Termination {
+fn farol(infrastructure: &FakeInfrastructure, arguments: &str) -> Response {
     infrastructure.run(arguments).expect("valid command line")
 }
 
-fn stopped(message: &str) -> Termination {
-    Termination {
+fn stopped(message: &str) -> Response {
+    Response {
         success: false,
         output: String::new(),
         error: format!("farol: {message}\n"),
@@ -72,14 +72,14 @@ fn should_check_an_unchanged_record_and_succeed() {
         FakeDnsGateway::default().with_addresses("home", &[PUBLIC_ADDRESS]),
     );
 
-    let termination = farol(&infrastructure, CHECK_HOME);
+    let response = farol(&infrastructure, CHECK_HOME);
 
-    let expected = Termination {
+    let expected = Response {
         success: true,
         output: "public IP 8.8.8.8\nhome.example.com: unchanged\n".to_owned(),
         error: String::new(),
     };
-    assert_eq!(expected, termination);
+    assert_eq!(expected, response);
 }
 
 #[test]
@@ -88,11 +88,11 @@ fn should_check_a_drifted_record_without_pointing_it() {
         FakeDnsGateway::default().with_addresses("home", &[OLD_ADDRESS]),
     );
 
-    let termination = farol(&infrastructure, CHECK_HOME);
+    let response = farol(&infrastructure, CHECK_HOME);
 
     let expected = "public IP 8.8.8.8\nhome.example.com: drifted (now 1.1.1.1, TTL 300)\n";
-    assert_eq!(expected, termination.output);
-    assert!(termination.success);
+    assert_eq!(expected, response.output);
+    assert!(response.success);
     assert_eq!(nothing_pointed(), infrastructure.dns_gateway.pointed());
 }
 
@@ -102,14 +102,14 @@ fn should_sync_a_drifted_record_by_pointing_it() {
         FakeDnsGateway::default().with_addresses("home", &[OLD_ADDRESS]),
     );
 
-    let termination = farol(
+    let response = farol(
         &infrastructure,
         "sync --provider hostinger --record example.com:home",
     );
 
     let expected = "public IP 8.8.8.8\nhome.example.com: pointed (was 1.1.1.1, TTL 300)\n";
-    assert_eq!(expected, termination.output);
-    assert!(termination.success);
+    assert_eq!(expected, response.output);
+    assert!(response.success);
     assert_eq!(
         vec![(tracked("home"), public_ip())],
         infrastructure.dns_gateway.pointed()
@@ -125,7 +125,7 @@ fn should_report_every_record_but_fail_when_one_fails() {
             .with_addresses("lab", &[PUBLIC_ADDRESS]),
     );
 
-    let termination = farol(
+    let response = farol(
         &infrastructure,
         "check --provider hostinger --record example.com:home --record example.com:lab",
     );
@@ -133,8 +133,8 @@ fn should_report_every_record_but_fail_when_one_fails() {
     let expected = "public IP 8.8.8.8\n\
         home.example.com: failed, the DNS provider is unavailable (timeout)\n\
         lab.example.com: unchanged\n";
-    assert_eq!(expected, termination.output);
-    assert!(!termination.success);
+    assert_eq!(expected, response.output);
+    assert!(!response.success);
 }
 
 #[test]
@@ -145,22 +145,22 @@ fn should_stop_when_the_public_ip_is_unavailable() {
         ..FakeInfrastructure::default()
     };
 
-    let termination = farol(&infrastructure, CHECK_HOME);
+    let response = farol(&infrastructure, CHECK_HOME);
 
     let message = "could not find the public IP: the public IP service is unavailable (offline)";
-    assert_eq!(stopped(message), termination);
+    assert_eq!(stopped(message), response);
 }
 
 #[test]
 fn should_stop_on_an_invalid_record_argument() {
-    let termination = farol(
+    let response = farol(
         &FakeInfrastructure::default(),
         "check --provider hostinger --record example.com",
     );
 
     let message =
         "invalid record \"example.com\": expected DOMAIN:NAME, for example example.com:home";
-    assert_eq!(stopped(message), termination);
+    assert_eq!(stopped(message), response);
 }
 
 #[test]
@@ -170,9 +170,9 @@ fn should_stop_when_the_dns_provider_cannot_be_reached() {
         ..FakeInfrastructure::default()
     };
 
-    let termination = farol(&infrastructure, CHECK_HOME);
+    let response = farol(&infrastructure, CHECK_HOME);
 
-    assert_eq!(stopped("no token"), termination);
+    assert_eq!(stopped("no token"), response);
 }
 
 #[test]

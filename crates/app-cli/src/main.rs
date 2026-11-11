@@ -22,12 +22,12 @@ const HOSTINGER_URL: &str = "https://developers.hostinger.com";
 const HOSTINGER_TIMEOUT: Duration = Duration::from_secs(30);
 
 fn main() -> ExitCode {
-    let termination = run(env::args_os(), &Internet).unwrap_or_else(|error| error.exit());
+    let response = run(env::args_os(), &Internet).unwrap_or_else(|error| error.exit());
 
-    print!("{}", termination.output);
-    eprint!("{}", termination.error);
+    print!("{}", response.output);
+    eprint!("{}", response.error);
 
-    if termination.success {
+    if response.success {
         ExitCode::SUCCESS
     } else {
         ExitCode::FAILURE

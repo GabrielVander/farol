@@ -47,13 +47,13 @@ pub enum Provider {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Termination {
+pub struct Response {
     pub success: bool,
     pub output: String,
     pub error: String,
 }
 
-impl Termination {
+impl Response {
     fn reported(report: &Report) -> Self {
         Self {
             success: !report.has_failures(),
@@ -71,10 +71,10 @@ impl Termination {
     }
 }
 
-pub fn handle(request: &RecordsRequest, infrastructure: &impl Infrastructure) -> Termination {
+pub fn handle(request: &RecordsRequest, infrastructure: &impl Infrastructure) -> Response {
     match execute(request, infrastructure) {
-        Ok(report) => Termination::reported(&report),
-        Err(message) => Termination::stopped(&message),
+        Ok(report) => Response::reported(&report),
+        Err(message) => Response::stopped(&message),
     }
 }
 

@@ -3,7 +3,7 @@ use std::ffi::OsString;
 use clap::Parser;
 
 use crate::{
-    adapters::controllers::records_controller::{Infrastructure, Termination, handle},
+    adapters::controllers::records_controller::{Infrastructure, Response, handle},
     infrastructure::command_line::Cli,
 };
 
@@ -12,7 +12,7 @@ use crate::{
 pub fn run<T: Into<OsString> + Clone>(
     arguments: impl IntoIterator<Item = T>,
     infrastructure: &impl Infrastructure,
-) -> Result<Termination, clap::Error> {
+) -> Result<Response, clap::Error> {
     let cli = Cli::try_parse_from(arguments)?;
     Ok(handle(&cli.into_request(), infrastructure))
 }
