@@ -26,6 +26,7 @@ pub fn tracked_records(
     ttl: u32,
 ) -> Result<Vec<TrackedRecord>, RecordArgumentError> {
     let ttl = Ttl::try_from(ttl).map_err(RecordArgumentError::InvalidTtl)?;
+
     arguments
         .iter()
         .map(|argument| tracked_record(argument, ttl))
@@ -36,6 +37,7 @@ fn tracked_record(argument: &str, ttl: Ttl) -> Result<TrackedRecord, RecordArgum
     let (domain, name) = argument
         .split_once(':')
         .ok_or_else(|| RecordArgumentError::MissingSeparator(argument.to_owned()))?;
+
     Ok(TrackedRecord {
         domain: parse_domain(domain)?,
         name: parse_record_name(name)?,

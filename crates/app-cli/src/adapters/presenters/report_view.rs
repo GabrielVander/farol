@@ -16,6 +16,7 @@ const APEX: &str = "@";
 /// The report as lines of text: the public IP, then one line per tracked record.
 pub fn render(report: &Report) -> String {
     let header = format!("public IP {}\n", report.public_ip.address());
+
     report
         .records
         .iter()
@@ -44,6 +45,7 @@ pub fn explain_public_ip_error(error: &PublicIpGatewayError) -> String {
             format!("the public IP service answered {address}, which is not a public address")
         }
     };
+
     format!("could not find the public IP: {reason}")
 }
 
@@ -89,6 +91,7 @@ fn detail(error: &DnsGatewayError) -> &str {
 
 fn summary(published: &PublishedRecord) -> String {
     let addresses = list(&published.addresses);
+
     match published.ttl {
         Some(ttl) => format!("{addresses}, TTL {ttl}"),
         None => addresses,
@@ -99,6 +102,7 @@ fn list(addresses: &[Ipv4Addr]) -> String {
     if addresses.is_empty() {
         return "no A record".to_owned();
     }
+
     let addresses: Vec<String> = addresses.iter().map(Ipv4Addr::to_string).collect();
     addresses.join(", ")
 }
@@ -147,6 +151,7 @@ mod test {
             name: RecordName::try_from(name).expect("valid record name"),
             ttl: Ttl::try_from(300).expect("valid ttl"),
         };
+
         Report {
             public_ip: public_ip(),
             records: vec![RecordOutcome { record, outcome }],

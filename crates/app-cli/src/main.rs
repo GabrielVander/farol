@@ -23,8 +23,10 @@ const HOSTINGER_TIMEOUT: Duration = Duration::from_secs(30);
 
 fn main() -> ExitCode {
     let termination = run(env::args_os(), &Internet).unwrap_or_else(|error| error.exit());
+
     print!("{}", termination.output);
     eprint!("{}", termination.error);
+
     if termination.success {
         ExitCode::SUCCESS
     } else {
@@ -50,6 +52,7 @@ impl Infrastructure for Internet {
                     format!("set {HOSTINGER_TOKEN_VARIABLE} to a Hostinger API token")
                 })?;
                 let api = UreqHostingerApi::new(HOSTINGER_URL.to_owned(), token, HOSTINGER_TIMEOUT);
+
                 Ok(Arc::new(HostingerDnsGateway::new(api)))
             }
         }

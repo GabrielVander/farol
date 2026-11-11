@@ -84,11 +84,14 @@ fn execute(
 ) -> Result<Report, String> {
     let records = tracked_records(&request.records, request.ttl)
         .map_err(|error| explain_record_argument_error(&error))?;
+
     let dns_gateway = infrastructure.dns_gateway(request.provider)?;
     let public_ip_gateway = infrastructure.public_ip_gateway();
+
     let report = match request.action {
         Action::Check => CheckRecords::new(public_ip_gateway, dns_gateway).execute(&records),
         Action::Sync => SyncRecords::new(public_ip_gateway, dns_gateway).execute(&records),
     };
+
     report.map_err(|error| explain_public_ip_error(&error))
 }

@@ -105,6 +105,7 @@ mod test {
                 domain: "x".to_owned(),
                 reason,
             };
+
             assert_eq!(
                 format!("invalid domain \"x\": {problem}"),
                 explain_record_argument_error(&error)

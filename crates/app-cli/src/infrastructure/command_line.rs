@@ -16,6 +16,7 @@ impl Cli {
             Command::Check(options) => (Action::Check, options),
             Command::Sync(options) => (Action::Sync, options),
         };
+
         RecordsRequest {
             action,
             provider: options.provider.into(),
