@@ -72,8 +72,10 @@ impl DnsGateway for FakeDnsGateway {
         if let Some(error) = self.point_failures.get(record.name.as_str()) {
             return Err(error.clone());
         }
+
         let mut pointed = self.pointed.lock().expect("unpoisoned");
         pointed.push((record.clone(), public_ip));
+
         Ok(())
     }
 }
