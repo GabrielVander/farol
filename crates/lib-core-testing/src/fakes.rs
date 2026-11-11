@@ -1,4 +1,8 @@
-use std::{collections::HashMap, net::Ipv4Addr, sync::Mutex};
+use std::{
+    collections::{HashMap, VecDeque},
+    net::Ipv4Addr,
+    sync::Mutex,
+};
 
 use lib_core::{
     entities::{public_ip::PublicIp, tracked_record::TrackedRecord},
@@ -10,18 +14,44 @@ use lib_core::{
 
 use crate::fixtures::{public_ip, published};
 
-#[derive(Debug, Clone)]
-pub struct FakePublicIpGateway(pub Result<PublicIp, PublicIpGatewayError>);
+/// A public IP service that gives its answers in order, then repeats the last one.
+#[derive(Debug)]
+pub struct FakePublicIpGateway {
+    answers: Mutex<VecDeque<Result<PublicIp, PublicIpGatewayError>>>,
+}
+
+impl FakePublicIpGateway {
+    /// # Panics
+    ///
+    /// When `answers` is empty, because the fake would have nothing to answer.
+    pub fn answering(answers: Vec<Result<PublicIp, PublicIpGatewayError>>) -> Self {
+        assert!(!answers.is_empty(), "the fake needs at least one answer");
+
+        Self {
+            answers: Mutex::new(answers.into()),
+        }
+    }
+
+    pub fn failing(error: PublicIpGatewayError) -> Self {
+        Self::answering(vec![Err(error)])
+    }
+}
 
 impl Default for FakePublicIpGateway {
     fn default() -> Self {
-        Self(Ok(public_ip()))
+        Self::answering(vec![Ok(public_ip())])
     }
 }
 
 impl PublicIpGateway for FakePublicIpGateway {
     fn current_public_ip(&self) -> Result<PublicIp, PublicIpGatewayError> {
-        self.0.clone()
+        let mut answers = self.answers.lock().expect("unpoisoned");
+
+        if answers.len() > 1 {
+            return answers.pop_front().expect("an answer");
+        }
+
+        answers.front().expect("an answer").clone()
     }
 }
 

@@ -127,7 +127,7 @@ fn should_stop_when_the_public_ip_is_unavailable() {
     let error = PublicIpGatewayError::Unavailable("offline".to_owned());
     let dns_gateway = Arc::new(FakeDnsGateway::default());
     let sync_records = SyncRecords::new(
-        Arc::new(FakePublicIpGateway(Err(error.clone()))),
+        Arc::new(FakePublicIpGateway::failing(error.clone())),
         Arc::clone(&dns_gateway),
     );
 

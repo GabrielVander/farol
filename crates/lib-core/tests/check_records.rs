@@ -140,7 +140,7 @@ fn should_report_failed_when_reading_fails_and_check_the_rest() {
 fn should_stop_when_the_public_ip_is_unavailable() {
     let error = PublicIpGatewayError::Unavailable("offline".to_owned());
     let check_records = CheckRecords::new(
-        Arc::new(FakePublicIpGateway(Err(error.clone()))),
+        Arc::new(FakePublicIpGateway::failing(error.clone())),
         Arc::new(FakeDnsGateway::default()),
     );
 

@@ -141,7 +141,7 @@ fn should_report_every_record_but_fail_when_one_fails() {
 fn should_stop_when_the_public_ip_is_unavailable() {
     let error = PublicIpGatewayError::Unavailable("offline".to_owned());
     let infrastructure = FakeInfrastructure {
-        public_ip_gateway: Arc::new(FakePublicIpGateway(Err(error))),
+        public_ip_gateway: Arc::new(FakePublicIpGateway::failing(error)),
         ..FakeInfrastructure::default()
     };
 
