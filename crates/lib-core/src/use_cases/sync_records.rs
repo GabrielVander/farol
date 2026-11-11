@@ -18,12 +18,8 @@ pub trait SyncRecordsUseCase {
 impl<P: PublicIpGateway, D: DnsGateway> SyncRecordsUseCase for SyncRecords<P, D> {
     fn execute(&self, records: &[TrackedRecord]) -> Result<Report, PublicIpGatewayError> {
         let public_ip = self.public_ip_gateway.current_public_ip()?;
-        let records = records
-            .iter()
-            .map(|record| self.sync(record, public_ip))
-            .collect();
 
-        Ok(Report { public_ip, records })
+        Ok(self.sync_to(records, public_ip))
     }
 }
 
@@ -38,6 +34,16 @@ impl<P: PublicIpGateway, D: DnsGateway> SyncRecords<P, D> {
             public_ip_gateway,
             dns_gateway,
         }
+    }
+
+    /// Syncs `records` to a public IP the caller already knows.
+    pub(crate) fn sync_to(&self, records: &[TrackedRecord], public_ip: PublicIp) -> Report {
+        let records = records
+            .iter()
+            .map(|record| self.sync(record, public_ip))
+            .collect();
+
+        Report { public_ip, records }
     }
 
     fn sync(&self, record: &TrackedRecord, public_ip: PublicIp) -> RecordOutcome {
