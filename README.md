@@ -12,11 +12,22 @@ It runs once and exits. Schedule it with a systemd timer or cron.
 
 ## Install
 
+Straight from the repository, without cloning it first:
+
+```sh
+cargo install --locked --git https://github.com/GabrielVander/farol app-cli
+```
+
+Add `--tag <tag>` or `--rev <commit>` to pin a version instead of taking the
+latest `main`. Run the same command with `--force` to upgrade.
+
+Or from a local clone:
+
 ```sh
 cargo install --locked --path crates/app-cli
 ```
 
-This installs the `farol` binary into `~/.cargo/bin`.
+Either way, this installs the `farol` binary into `~/.cargo/bin`.
 
 ## Configure
 
