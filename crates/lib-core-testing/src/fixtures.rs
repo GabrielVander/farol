@@ -26,7 +26,7 @@ pub fn tracked(name: &str) -> TrackedRecord {
     }
 }
 
-/// What `Scenario::pointed` holds when farol pointed no record.
+/// What `FakeDnsGateway::pointed` holds when farol pointed no record.
 pub fn nothing_pointed() -> Vec<(TrackedRecord, PublicIp)> {
     Vec::new()
 }
