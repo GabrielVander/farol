@@ -9,12 +9,18 @@ use lib_core::{
 };
 
 pub const PUBLIC_ADDRESS: Ipv4Addr = Ipv4Addr::new(8, 8, 8, 8);
+/// Where the public IP moves to when a test changes it.
+pub const NEXT_ADDRESS: Ipv4Addr = Ipv4Addr::new(9, 9, 9, 9);
 pub const OLD_ADDRESS: Ipv4Addr = Ipv4Addr::new(1, 1, 1, 1);
 pub const DOMAIN: &str = "example.com";
 pub const TRACKED_TTL: u32 = 300;
 
 pub fn public_ip() -> PublicIp {
     PublicIp::try_from(PUBLIC_ADDRESS).expect("public ip")
+}
+
+pub fn next_public_ip() -> PublicIp {
+    PublicIp::try_from(NEXT_ADDRESS).expect("public ip")
 }
 
 /// A record of `DOMAIN` tracked with `TRACKED_TTL`.

@@ -6,7 +6,7 @@ use lib_core::use_cases::{
 };
 use lib_core_testing::{
     fakes::{FakeDnsGateway, FakePublicIpGateway},
-    fixtures::{OLD_ADDRESS, public_ip, published, tracked},
+    fixtures::{OLD_ADDRESS, next_public_ip, public_ip, published, tracked},
 };
 
 #[test]
@@ -47,4 +47,31 @@ fn should_skip_a_round_whose_public_ip_was_already_synced() {
 
     assert_eq!(Ok(None), report);
     assert_eq!(vec![(tracked("home"), public_ip())], dns_gateway.pointed());
+}
+
+#[test]
+fn should_sync_again_when_the_public_ip_changes() {
+    let dns_gateway = Arc::new(FakeDnsGateway::default().with_addresses("home", &[OLD_ADDRESS]));
+    let mut watch_records = WatchRecords::new(
+        Arc::new(FakePublicIpGateway::answering(vec![
+            Ok(public_ip()),
+            Ok(next_public_ip()),
+        ])),
+        Arc::clone(&dns_gateway),
+    );
+    watch_records
+        .execute(&[tracked("home")])
+        .expect("first round");
+
+    let report = watch_records.execute(&[tracked("home")]);
+
+    let report = report.expect("round").expect("a report");
+    assert_eq!(next_public_ip(), report.public_ip);
+    assert_eq!(
+        vec![
+            (tracked("home"), public_ip()),
+            (tracked("home"), next_public_ip())
+        ],
+        dns_gateway.pointed()
+    );
 }
