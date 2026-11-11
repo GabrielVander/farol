@@ -1,6 +1,9 @@
 //! farol as a whole, driven through its command line with fake services.
 
-use std::sync::Arc;
+use std::{
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 
 use app_cli::{
     adapters::controllers::records_controller::{Infrastructure, Provider, Response},
@@ -12,16 +15,20 @@ use lib_core::use_cases::ports::{
 };
 use lib_core_testing::{
     fakes::{FakeDnsGateway, FakePublicIpGateway},
-    fixtures::{OLD_ADDRESS, PUBLIC_ADDRESS, nothing_pointed, public_ip, tracked},
+    fixtures::{OLD_ADDRESS, PUBLIC_ADDRESS, next_public_ip, nothing_pointed, public_ip, tracked},
 };
 
 const CHECK_HOME: &str = "check --provider hostinger --record example.com:home";
+const WATCH_HOME: &str = "sync --watch --provider hostinger --record example.com:home";
 
 #[derive(Default)]
 struct FakeInfrastructure {
     public_ip_gateway: Arc<FakePublicIpGateway>,
     dns_gateway: Arc<FakeDnsGateway>,
     provider_failure: Option<String>,
+    ticks: usize,
+    waits: Mutex<Vec<Duration>>,
+    shown: Mutex<Vec<Response>>,
 }
 
 impl FakeInfrastructure {
@@ -30,6 +37,14 @@ impl FakeInfrastructure {
             dns_gateway: Arc::new(dns_gateway),
             ..Self::default()
         }
+    }
+
+    fn waits(&self) -> Vec<Duration> {
+        self.waits.lock().expect("unpoisoned").clone()
+    }
+
+    fn shown(&self) -> Vec<Response> {
+        self.shown.lock().expect("unpoisoned").clone()
     }
 
     fn run(&self, arguments: &str) -> Result<Response, clap::Error> {
@@ -52,10 +67,29 @@ impl Infrastructure for FakeInfrastructure {
             None => Ok(Arc::clone(&self.dns_gateway)),
         }
     }
+
+    fn ticks(&self, interval: Duration) -> impl Iterator<Item = ()> {
+        (0..self.ticks).map(move |_| self.waits.lock().expect("unpoisoned").push(interval))
+    }
+
+    fn show(&self, response: &Response) {
+        self.shown
+            .lock()
+            .expect("unpoisoned")
+            .push(response.clone());
+    }
 }
 
 fn farol(infrastructure: &FakeInfrastructure, arguments: &str) -> Response {
     infrastructure.run(arguments).expect("valid command line")
+}
+
+fn reported(output: &str) -> Response {
+    Response {
+        success: true,
+        output: output.to_owned(),
+        error: String::new(),
+    }
 }
 
 fn stopped(message: &str) -> Response {
@@ -173,6 +207,30 @@ fn should_stop_when_the_dns_provider_cannot_be_reached() {
     let response = farol(&infrastructure, CHECK_HOME);
 
     assert_eq!(stopped("no token"), response);
+}
+
+#[test]
+fn should_watch_and_show_a_report_only_when_the_public_ip_changes() {
+    let infrastructure = FakeInfrastructure {
+        public_ip_gateway: Arc::new(FakePublicIpGateway::answering(vec![
+            Ok(public_ip()),
+            Ok(public_ip()),
+            Ok(next_public_ip()),
+        ])),
+        dns_gateway: Arc::new(FakeDnsGateway::default().with_addresses("home", &[OLD_ADDRESS])),
+        ticks: 2,
+        ..FakeInfrastructure::default()
+    };
+
+    let response = farol(&infrastructure, WATCH_HOME);
+
+    let expected = vec![
+        reported("public IP 8.8.8.8\nhome.example.com: pointed (was 1.1.1.1, TTL 300)\n"),
+        reported("public IP 9.9.9.9\nhome.example.com: pointed (was 1.1.1.1, TTL 300)\n"),
+    ];
+    assert_eq!(expected, infrastructure.shown());
+    assert_eq!(vec![Duration::from_secs(300); 2], infrastructure.waits());
+    assert_eq!(reported(""), response);
 }
 
 #[test]

@@ -1,7 +1,7 @@
-use std::{env, process::ExitCode, sync::Arc, time::Duration};
+use std::{env, iter, process::ExitCode, sync::Arc, thread, time::Duration};
 
 use app_cli::{
-    adapters::controllers::records_controller::{Infrastructure, Provider},
+    adapters::controllers::records_controller::{Infrastructure, Provider, Response},
     infrastructure::{
         run::run,
         token::{HOSTINGER_TOKEN_VARIABLE, hostinger_token},
@@ -24,8 +24,7 @@ const HOSTINGER_TIMEOUT: Duration = Duration::from_secs(30);
 fn main() -> ExitCode {
     let response = run(env::args_os(), &Internet).unwrap_or_else(|error| error.exit());
 
-    print!("{}", response.output);
-    eprint!("{}", response.error);
+    Internet.show(&response);
 
     if response.success {
         ExitCode::SUCCESS
@@ -56,6 +55,15 @@ impl Infrastructure for Internet {
                 Ok(Arc::new(HostingerDnsGateway::new(api)))
             }
         }
+    }
+
+    fn ticks(&self, interval: Duration) -> impl Iterator<Item = ()> {
+        iter::repeat_with(move || thread::sleep(interval))
+    }
+
+    fn show(&self, response: &Response) {
+        print!("{}", response.output);
+        eprint!("{}", response.error);
     }
 }
 

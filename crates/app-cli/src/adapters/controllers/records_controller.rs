@@ -1,10 +1,17 @@
-use std::sync::Arc;
+use std::{iter, sync::Arc, time::Duration};
 
-use lib_core::use_cases::{
-    check_records::{CheckRecords, CheckRecordsUseCase},
-    ports::{dns_gateway::DnsGateway, public_ip_gateway::PublicIpGateway},
-    report::Report,
-    sync_records::{SyncRecords, SyncRecordsUseCase},
+use lib_core::{
+    entities::tracked_record::TrackedRecord,
+    use_cases::{
+        check_records::{CheckRecords, CheckRecordsUseCase},
+        ports::{
+            dns_gateway::DnsGateway,
+            public_ip_gateway::{PublicIpGateway, PublicIpGatewayError},
+        },
+        report::Report,
+        sync_records::{SyncRecords, SyncRecordsUseCase},
+        watch_records::{WatchRecords, WatchRecordsUseCase},
+    },
 };
 
 use crate::adapters::{
@@ -24,6 +31,12 @@ pub trait Infrastructure {
     fn public_ip_gateway(&self) -> Arc<Self::PublicIpGateway>;
 
     fn dns_gateway(&self, provider: Provider) -> Result<Arc<Self::DnsGateway>, String>;
+
+    /// One item after each wait of `interval`, for as long as a watch should go on.
+    fn ticks(&self, interval: Duration) -> impl Iterator<Item = ()>;
+
+    /// Shows the response of a watch round as soon as it is ready.
+    fn show(&self, response: &Response);
 }
 
 /// What farol was asked to do, with the records still as the user wrote them.
@@ -39,6 +52,10 @@ pub struct RecordsRequest {
 pub enum Action {
     Check,
     Sync,
+    /// Sync, then sync again every time the public IP changes.
+    Watch {
+        interval: Duration,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -62,6 +79,15 @@ impl Response {
         }
     }
 
+    /// How a watch ends: every round already showed its own response.
+    fn watched() -> Self {
+        Self {
+            success: true,
+            output: String::new(),
+            error: String::new(),
+        }
+    }
+
     fn stopped(message: &str) -> Self {
         Self {
             success: false,
@@ -72,26 +98,54 @@ impl Response {
 }
 
 pub fn handle(request: &RecordsRequest, infrastructure: &impl Infrastructure) -> Response {
-    match execute(request, infrastructure) {
-        Ok(report) => Response::reported(&report),
-        Err(message) => Response::stopped(&message),
-    }
+    execute(request, infrastructure).unwrap_or_else(|message| Response::stopped(&message))
 }
 
 fn execute(
     request: &RecordsRequest,
     infrastructure: &impl Infrastructure,
-) -> Result<Report, String> {
+) -> Result<Response, String> {
     let records = tracked_records(&request.records, request.ttl)
         .map_err(|error| explain_record_argument_error(&error))?;
 
     let dns_gateway = infrastructure.dns_gateway(request.provider)?;
     let public_ip_gateway = infrastructure.public_ip_gateway();
 
-    let report = match request.action {
-        Action::Check => CheckRecords::new(public_ip_gateway, dns_gateway).execute(&records),
-        Action::Sync => SyncRecords::new(public_ip_gateway, dns_gateway).execute(&records),
+    let response = match request.action {
+        Action::Check => {
+            respond(CheckRecords::new(public_ip_gateway, dns_gateway).execute(&records))
+        }
+        Action::Sync => respond(SyncRecords::new(public_ip_gateway, dns_gateway).execute(&records)),
+        Action::Watch { interval } => watch(
+            WatchRecords::new(public_ip_gateway, dns_gateway),
+            &records,
+            interval,
+            infrastructure,
+        ),
     };
 
-    report.map_err(|error| explain_public_ip_error(&error))
+    Ok(response)
+}
+
+fn respond(report: Result<Report, PublicIpGatewayError>) -> Response {
+    match report {
+        Ok(report) => Response::reported(&report),
+        Err(error) => Response::stopped(&explain_public_ip_error(&error)),
+    }
+}
+
+/// Runs a first round at once, then one more round after every tick.
+fn watch(
+    mut watch_records: impl WatchRecordsUseCase,
+    records: &[TrackedRecord],
+    interval: Duration,
+    infrastructure: &impl Infrastructure,
+) -> Response {
+    for () in iter::once(()).chain(infrastructure.ticks(interval)) {
+        if let Some(round) = watch_records.execute(records).transpose() {
+            infrastructure.show(&respond(round));
+        }
+    }
+
+    Response::watched()
 }
