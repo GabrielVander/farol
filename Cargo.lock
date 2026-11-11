@@ -408,6 +408,13 @@ name = "lib-core"
 version = "0.1.0"
 
 [[package]]
+name = "lib-core-testing"
+version = "0.1.0"
+dependencies = [
+ "lib-core",
+]
+
+[[package]]
 name = "lib-hostinger"
 version = "0.1.0"
 dependencies = [

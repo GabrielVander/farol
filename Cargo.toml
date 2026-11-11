@@ -1,6 +1,7 @@
 [workspace]
 members = [
   "crates/lib-core",
+  "crates/lib-core-testing",
   "crates/lib-ipify",
   "crates/lib-hostinger",
   "crates/app-cli",
@@ -14,6 +15,7 @@ license = "MIT"
 
 [workspace.dependencies]
 lib-core = { path = "crates/lib-core" }
+lib-core-testing = { path = "crates/lib-core-testing" }
 lib-ipify = { path = "crates/lib-ipify" }
 lib-hostinger = { path = "crates/lib-hostinger" }
 ureq = "3.5.1"
