@@ -107,67 +107,6 @@ FAROL_HOSTINGER_TOKEN=...
 */5 * * * * /usr/local/bin/farol sync --provider hostinger --record example.com:home
 ```
 
-## Architecture
-
-The diagrams follow the [C4 model](https://c4model.com), zooming in one level
-at a time. The crate diagram under [Development](#development) is the third
-level, the components inside the `farol` binary.
-
-**System context.** farol and the people and systems it works with.
-
-```mermaid
-flowchart TB
-    operator["<b>Home server operator</b><br/>[Person]<br/>Installs farol, chooses the records,<br/>runs check by hand"]
-    scheduler["<b>systemd timer / cron</b><br/>[Software System]<br/>Runs farol every few minutes"]
-    farol["<b>farol</b><br/>[Software System]<br/>Keeps DNS A records pointed at<br/>the machine's public IP"]
-    ipify["<b>ipify</b><br/>[External System]<br/>Reports the caller's public IPv4"]
-    hostinger["<b>Hostinger DNS API</b><br/>[External System]<br/>Hosts the domain's DNS zone"]
-
-    operator -- "Runs check / sync,<br/>reads output" --> farol
-    scheduler -- "Runs sync" --> farol
-    farol -- "Asks for the public IP<br/>[HTTPS]" --> ipify
-    farol -- "Reads zones, points A records<br/>[HTTPS, API token]" --> hostinger
-
-    classDef person fill:#08427b,stroke:#052e56,color:#fff
-    classDef system fill:#1168bd,stroke:#0b4884,color:#fff
-    classDef external fill:#999,stroke:#6b6b6b,color:#fff
-    class operator person
-    class farol system
-    class scheduler,ipify,hostinger external
-```
-
-**Containers.** What runs and what stores data when farol is installed with
-the systemd units from [`contrib/systemd`](contrib/systemd).
-
-```mermaid
-flowchart TB
-    operator["<b>Home server operator</b><br/>[Person]"]
-
-    subgraph farolBoundary["farol [Software System]"]
-        timer["<b>farol.timer + farol.service</b><br/>[Container: systemd units]<br/>Every five minutes, runs farol sync<br/>as a sandboxed dynamic user"]
-        cli["<b>farol</b><br/>[Container: Rust binary]<br/>Compares records with the public IP,<br/>points the drifted ones, then exits"]
-        env[("<b>/etc/farol/farol.env</b><br/>[Container: env file, mode 600]<br/>Holds FAROL_HOSTINGER_TOKEN")]
-    end
-
-    ipify["<b>ipify</b><br/>[External System]"]
-    hostinger["<b>Hostinger DNS API</b><br/>[External System]"]
-
-    operator -- "Runs check / sync<br/>[shell]" --> cli
-    operator -- "Installs and edits --record values" --> timer
-    timer -- "Starts, with the token<br/>in the environment" --> cli
-    env -- "Loaded through EnvironmentFile" --> timer
-    cli -- "GET public IP<br/>[HTTPS, ureq]" --> ipify
-    cli -- "GET zone, PUT A records<br/>[HTTPS + Bearer token, ureq]" --> hostinger
-
-    classDef person fill:#08427b,stroke:#052e56,color:#fff
-    classDef container fill:#438dd5,stroke:#2e6295,color:#fff
-    classDef external fill:#999,stroke:#6b6b6b,color:#fff
-    class operator person
-    class timer,cli,env container
-    class ipify,hostinger external
-    style farolBoundary fill:none,stroke:#888,stroke-dasharray:5 5
-```
-
 ## Development
 
 farol tracks stable Rust through `rust-toolchain.toml`. See
@@ -189,41 +128,26 @@ cargo llvm-cov --workspace
 
 A new DNS provider is a new slice crate that implements `DnsGateway`.
 
-**Components.** The third C4 level: the crates inside the `farol` binary.
-Every arrow points inward, toward `lib-core`. The core defines the gateway
-traits, the slice crates implement them, and only `app-cli` knows about all of
-them.
+Each arrow points from a crate to a crate it depends on. Dashed arrows are
+dev-dependencies, used only by the tests.
 
 ```mermaid
 flowchart LR
-    subgraph binary["farol [Container: Rust binary]"]
-        cli["<b>app-cli</b><br/>[Component: crate]<br/>The farol command: arguments,<br/>output and wiring"]
-        core["<b>lib-core</b><br/>[Component: crate]<br/>Entities, use cases (check, sync)<br/>and gateway traits"]
-        ipify["<b>lib-ipify</b><br/>[Component: crate]<br/>Finds the public IP"]
-        hostinger["<b>lib-hostinger</b><br/>[Component: crate]<br/>Reads and points A records"]
-    end
+    cli[app-cli]
+    core[lib-core]
+    ipify[lib-ipify]
+    hostinger[lib-hostinger]
+    testing[lib-core-testing]
 
-    ipifyApi["<b>ipify</b><br/>[External System]"]
-    hostingerApi["<b>Hostinger DNS API</b><br/>[External System]"]
-
-    cli -- "Runs check / sync" --> core
-    cli -- "Wires in" --> ipify
-    cli -- "Wires in" --> hostinger
-    ipify -- "Implements PublicIpGateway" --> core
-    hostinger -- "Implements DnsGateway" --> core
-    ipify -- "GET public IP<br/>[HTTPS, ureq]" --> ipifyApi
-    hostinger -- "GET zone, PUT A records<br/>[HTTPS + Bearer token, ureq]" --> hostingerApi
-
-    classDef component fill:#85bbf0,stroke:#5d82a8,color:#000
-    classDef external fill:#999,stroke:#6b6b6b,color:#fff
-    class cli,core,ipify,hostinger component
-    class ipifyApi,hostingerApi external
-    style binary fill:none,stroke:#888,stroke-dasharray:5 5
+    cli --> core
+    cli --> ipify
+    cli --> hostinger
+    ipify --> core
+    hostinger --> core
+    testing --> core
+    cli -.-> testing
+    core -.-> testing
 ```
-
-`lib-core-testing` isn't in the diagram because it isn't in the binary. It
-holds the fakes and fixtures the tests share, and only `lib-core` and `app-cli`
-depend on it, as a dev-dependency.
 
 ### Project layout
 
