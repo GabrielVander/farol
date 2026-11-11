@@ -21,6 +21,7 @@ impl UreqHostingerApi {
             .timeout_global(Some(timeout))
             .http_status_as_error(false)
             .build();
+
         Self {
             base_url,
             token,
@@ -46,6 +47,7 @@ impl HostingerApi for UreqHostingerApi {
             .call()
             .map_err(unreachable)?;
         let body = successful_body(response)?;
+
         serde_json::from_str(&body)
             .map_err(|error| HostingerApiError::InvalidBody(error.to_string()))
     }
@@ -61,6 +63,7 @@ impl HostingerApi for UreqHostingerApi {
             .header("Authorization", self.authorization())
             .send_json(request)
             .map_err(unreachable)?;
+
         successful_body(response).map(|_| ())
     }
 }
@@ -68,9 +71,11 @@ impl HostingerApi for UreqHostingerApi {
 fn successful_body(mut response: Response<Body>) -> Result<String, HostingerApiError> {
     let status = response.status();
     let body = response.body_mut().read_to_string().map_err(unreachable)?;
+
     if status.is_success() {
         return Ok(body);
     }
+
     Err(status_error(status.as_u16(), &body))
 }
 
@@ -79,6 +84,7 @@ fn status_error(status: u16, body: &str) -> HostingerApiError {
         message: body.to_owned(),
         correlation_id: None,
     });
+
     HostingerApiError::Status {
         status,
         message: error.message,
@@ -127,35 +133,44 @@ mod test {
     fn serve_once(status_line: &'static str, body: &'static str) -> (String, JoinHandle<String>) {
         let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
         let base_url = format!("http://{}", listener.local_addr().expect("address"));
+
         let server = thread::spawn(move || {
             let (mut stream, _) = listener.accept().expect("accept");
             let request = read_request(&mut BufReader::new(&stream));
+
             let response = format!(
                 "HTTP/1.1 {status_line}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
                 body.len()
             );
             stream.write_all(response.as_bytes()).expect("write");
+
             request
         });
+
         (base_url, server)
     }
 
     fn read_request(reader: &mut impl BufRead) -> String {
         let mut head = String::new();
         let mut content_length = 0;
+
         loop {
             let mut line = String::new();
             reader.read_line(&mut line).expect("read line");
+
             if let Some(length) = line.to_ascii_lowercase().strip_prefix("content-length:") {
                 content_length = length.trim().parse().expect("length");
             }
+
             head.push_str(&line);
             if line == "\r\n" {
                 break;
             }
         }
+
         let mut body = vec![0; content_length];
         reader.read_exact(&mut body).expect("read body");
+
         head + &String::from_utf8(body).expect("utf-8")
     }
 
@@ -169,6 +184,7 @@ mod test {
         let zone = UreqHostingerApi::new(base_url, TOKEN.to_owned(), TIMEOUT).zone("example.com");
 
         assert_eq!(Ok(vec![home_record_set()]), zone);
+
         let request = server.join().expect("server").to_ascii_lowercase();
         assert!(request.starts_with("get /api/dns/v1/zones/example.com http/1.1\r\n"));
         assert!(request.contains("\r\nauthorization: bearer secret-token\r\n"));
@@ -186,11 +202,13 @@ mod test {
             .update_zone("example.com", &request);
 
         assert_eq!(Ok(()), result);
+
         let sent = server.join().expect("server");
         let lowercase = sent.to_ascii_lowercase();
         assert!(lowercase.starts_with("put /api/dns/v1/zones/example.com http/1.1\r\n"));
         assert!(lowercase.contains("\r\nauthorization: bearer secret-token\r\n"));
         assert!(lowercase.contains("\r\ncontent-type: application/json"));
+
         let (_, body) = sent.split_once("\r\n\r\n").expect("body");
         let expected = json!({
             "overwrite": true,

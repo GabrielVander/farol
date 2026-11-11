@@ -29,11 +29,14 @@ impl<A: HostingerApi> HostingerDnsGateway<A> {
 
     fn zone(&self, domain: &str) -> Result<Vec<RecordSet>, DnsGatewayError> {
         let mut zones = self.zones.lock().unwrap_or_else(PoisonError::into_inner);
+
         if let Some(record_sets) = zones.get(domain) {
             return Ok(record_sets.clone());
         }
+
         let record_sets = self.api.zone(domain).map_err(translate_error)?;
         zones.insert(domain.to_owned(), record_sets.clone());
+
         Ok(record_sets)
     }
 
@@ -46,6 +49,7 @@ impl<A: HostingerApi> HostingerDnsGateway<A> {
 impl<A: HostingerApi> DnsGateway for HostingerDnsGateway<A> {
     fn published(&self, record: &TrackedRecord) -> Result<PublishedRecord, DnsGatewayError> {
         let record_sets = self.zone(record.domain.as_str())?;
+
         Ok(PublishedRecord {
             addresses: addresses_in(&record_sets, record)?,
             ttl: ttl_in(&record_sets, record),
@@ -55,6 +59,7 @@ impl<A: HostingerApi> DnsGateway for HostingerDnsGateway<A> {
     fn point(&self, record: &TrackedRecord, public_ip: PublicIp) -> Result<(), DnsGatewayError> {
         let request = overwrite_request(record, public_ip);
         self.forget_zone(record.domain.as_str());
+
         self.api
             .update_zone(record.domain.as_str(), &request)
             .map_err(translate_error)
@@ -195,9 +200,11 @@ mod test {
     impl HostingerApi for FakeHostingerApi {
         fn zone(&self, domain: &str) -> Result<Vec<RecordSet>, HostingerApiError> {
             *self.zone_reads.lock().expect("unpoisoned") += 1;
+
             if let Some(error) = &self.zone_failure {
                 return Err(error.clone());
             }
+
             Ok(self.zones.get(domain).cloned().unwrap_or_default())
         }
 
@@ -209,8 +216,10 @@ mod test {
             if let Some(error) = &self.update_failure {
                 return Err(error.clone());
             }
+
             let mut updates = self.updates.lock().expect("unpoisoned");
             updates.push((domain.to_owned(), request.clone()));
+
             Ok(())
         }
     }
@@ -240,6 +249,7 @@ mod test {
 
     fn reading_error(error: HostingerApiError) -> DnsGatewayError {
         let gateway = HostingerDnsGateway::new(FakeHostingerApi::failing_with(error));
+
         gateway
             .published(&tracked("home"))
             .expect_err("reading should fail")
