@@ -1,4 +1,7 @@
+use std::sync::Arc;
+
 use lib_core::use_cases::{
+    check_records::{CheckRecords, CheckRecordsUseCase},
     ports::{
         dns_gateway::{DnsGatewayError, PublishedRecord},
         public_ip_gateway::PublicIpGatewayError,
@@ -6,15 +9,19 @@ use lib_core::use_cases::{
     report::{Outcome, RecordOutcome},
 };
 use lib_core_testing::{
+    fakes::{FakeDnsGateway, FakePublicIpGateway},
     fixtures::{OLD_ADDRESS, PUBLIC_ADDRESS, nothing_pointed, published, tracked},
-    scenario::Scenario,
 };
 
 #[test]
 fn should_report_unchanged_when_the_record_points_at_the_public_ip() {
-    let scenario = Scenario::default().publishing("home", &[PUBLIC_ADDRESS]);
+    let dns_gateway = FakeDnsGateway::default().with_addresses("home", &[PUBLIC_ADDRESS]);
+    let check_records = CheckRecords::new(
+        Arc::new(FakePublicIpGateway::default()),
+        Arc::new(dns_gateway),
+    );
 
-    let report = scenario.check(&["home"]).expect("report");
+    let report = check_records.execute(&[tracked("home")]).expect("report");
 
     let expected = RecordOutcome {
         record: tracked("home"),
@@ -25,9 +32,13 @@ fn should_report_unchanged_when_the_record_points_at_the_public_ip() {
 
 #[test]
 fn should_report_drifted_when_the_record_points_elsewhere() {
-    let scenario = Scenario::default().publishing("home", &[OLD_ADDRESS]);
+    let dns_gateway = FakeDnsGateway::default().with_addresses("home", &[OLD_ADDRESS]);
+    let check_records = CheckRecords::new(
+        Arc::new(FakePublicIpGateway::default()),
+        Arc::new(dns_gateway),
+    );
 
-    let report = scenario.check(&["home"]).expect("report");
+    let report = check_records.execute(&[tracked("home")]).expect("report");
 
     let expected = RecordOutcome {
         record: tracked("home"),
@@ -44,9 +55,13 @@ fn should_report_drifted_when_only_the_ttl_differs() {
         addresses: vec![PUBLIC_ADDRESS],
         ttl: Some(3600),
     };
-    let scenario = Scenario::default().publishing_record("home", current.clone());
+    let dns_gateway = FakeDnsGateway::default().with_published("home", current.clone());
+    let check_records = CheckRecords::new(
+        Arc::new(FakePublicIpGateway::default()),
+        Arc::new(dns_gateway),
+    );
 
-    let report = scenario.check(&["home"]).expect("report");
+    let report = check_records.execute(&[tracked("home")]).expect("report");
 
     let expected = RecordOutcome {
         record: tracked("home"),
@@ -57,7 +72,12 @@ fn should_report_drifted_when_only_the_ttl_differs() {
 
 #[test]
 fn should_report_a_missing_record_as_drifted() {
-    let report = Scenario::default().check(&["home"]).expect("report");
+    let check_records = CheckRecords::new(
+        Arc::new(FakePublicIpGateway::default()),
+        Arc::new(FakeDnsGateway::default()),
+    );
+
+    let report = check_records.execute(&[tracked("home")]).expect("report");
 
     let expected = RecordOutcome {
         record: tracked("home"),
@@ -71,9 +91,13 @@ fn should_report_a_missing_record_as_drifted() {
 #[test]
 fn should_report_several_addresses_as_drifted() {
     let addresses = [PUBLIC_ADDRESS, OLD_ADDRESS];
-    let scenario = Scenario::default().publishing("home", &addresses);
+    let dns_gateway = FakeDnsGateway::default().with_addresses("home", &addresses);
+    let check_records = CheckRecords::new(
+        Arc::new(FakePublicIpGateway::default()),
+        Arc::new(dns_gateway),
+    );
 
-    let report = scenario.check(&["home"]).expect("report");
+    let report = check_records.execute(&[tracked("home")]).expect("report");
 
     let expected = RecordOutcome {
         record: tracked("home"),
@@ -87,11 +111,17 @@ fn should_report_several_addresses_as_drifted() {
 #[test]
 fn should_report_failed_when_reading_fails_and_check_the_rest() {
     let error = DnsGatewayError::Unavailable("timeout".to_owned());
-    let scenario = Scenario::default()
-        .failing_to_read("home", error.clone())
-        .publishing("lab", &[PUBLIC_ADDRESS]);
+    let dns_gateway = FakeDnsGateway::default()
+        .with_read_failure("home", error.clone())
+        .with_addresses("lab", &[PUBLIC_ADDRESS]);
+    let check_records = CheckRecords::new(
+        Arc::new(FakePublicIpGateway::default()),
+        Arc::new(dns_gateway),
+    );
 
-    let report = scenario.check(&["home", "lab"]).expect("report");
+    let report = check_records
+        .execute(&[tracked("home"), tracked("lab")])
+        .expect("report");
 
     let expected = vec![
         RecordOutcome {
@@ -109,16 +139,23 @@ fn should_report_failed_when_reading_fails_and_check_the_rest() {
 #[test]
 fn should_stop_when_the_public_ip_is_unavailable() {
     let error = PublicIpGatewayError::Unavailable("offline".to_owned());
-    let scenario = Scenario::default().without_public_ip(error.clone());
+    let check_records = CheckRecords::new(
+        Arc::new(FakePublicIpGateway(Err(error.clone()))),
+        Arc::new(FakeDnsGateway::default()),
+    );
 
-    assert_eq!(Err(error), scenario.check(&["home"]));
+    assert_eq!(Err(error), check_records.execute(&[tracked("home")]));
 }
 
 #[test]
 fn should_never_point_a_drifted_record() {
-    let scenario = Scenario::default().publishing("home", &[OLD_ADDRESS]);
+    let dns_gateway = Arc::new(FakeDnsGateway::default().with_addresses("home", &[OLD_ADDRESS]));
+    let check_records = CheckRecords::new(
+        Arc::new(FakePublicIpGateway::default()),
+        Arc::clone(&dns_gateway),
+    );
 
-    scenario.check(&["home"]).expect("report");
+    check_records.execute(&[tracked("home")]).expect("report");
 
-    assert_eq!(nothing_pointed(), scenario.pointed());
+    assert_eq!(nothing_pointed(), dns_gateway.pointed());
 }
