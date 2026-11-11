@@ -50,12 +50,8 @@ impl<P: PublicIpGateway, D: DnsGateway> CheckRecords<P, D> {
 }
 
 fn outcome_of(current: PublishedRecord, record: &TrackedRecord, public_ip: PublicIp) -> Outcome {
-    if is_up_to_date(&current, record, public_ip) {
+    if current.is_up_to_date(record, public_ip) {
         return Outcome::Unchanged;
     }
     Outcome::Drifted { current }
-}
-
-fn is_up_to_date(current: &PublishedRecord, record: &TrackedRecord, public_ip: PublicIp) -> bool {
-    current.addresses == [public_ip.address()] && current.ttl == Some(record.ttl.seconds())
 }

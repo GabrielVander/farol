@@ -17,6 +17,14 @@ pub struct PublishedRecord {
     pub ttl: Option<u32>,
 }
 
+impl PublishedRecord {
+    /// Whether the provider already serves `record` exactly as farol would point it:
+    /// the public IP alone, with the tracked TTL.
+    pub fn is_up_to_date(&self, record: &TrackedRecord, public_ip: PublicIp) -> bool {
+        self.addresses == [public_ip.address()] && self.ttl == Some(record.ttl.seconds())
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DnsGatewayError {
     Unavailable(String),
