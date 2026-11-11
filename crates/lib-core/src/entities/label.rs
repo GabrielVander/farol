@@ -23,9 +23,11 @@ fn validate_length(label: &str) -> Result<(), LabelError> {
     if label.is_empty() {
         return Err(LabelError::Empty);
     }
+
     if label.len() > MAX_LABEL_LENGTH {
         return Err(LabelError::TooLong);
     }
+
     Ok(())
 }
 
@@ -40,6 +42,7 @@ fn validate_edges(label: &str) -> Result<(), LabelError> {
     if label.starts_with('-') || label.ends_with('-') {
         return Err(LabelError::HyphenAtEdge);
     }
+
     Ok(())
 }
 

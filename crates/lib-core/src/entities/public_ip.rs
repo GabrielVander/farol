@@ -22,6 +22,7 @@ impl TryFrom<Ipv4Addr> for PublicIp {
         if is_reserved(address) {
             return Err(PublicIpError::NotPublic(address));
         }
+
         Ok(Self(address))
     }
 }

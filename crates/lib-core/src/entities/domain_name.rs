@@ -27,8 +27,10 @@ impl TryFrom<&str> for DomainName {
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         let value = value.strip_suffix('.').unwrap_or(value);
+
         validate_length(value)?;
         validate_labels(value)?;
+
         Ok(Self(value.to_ascii_lowercase()))
     }
 }
@@ -39,9 +41,11 @@ fn validate_length(domain: &str) -> Result<(), DomainNameError> {
     if domain.is_empty() {
         return Err(DomainNameError::Empty);
     }
+
     if domain.len() > MAX_DOMAIN_LENGTH {
         return Err(DomainNameError::TooLong);
     }
+
     Ok(())
 }
 

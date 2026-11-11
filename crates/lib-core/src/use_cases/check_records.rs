@@ -22,6 +22,7 @@ impl<P: PublicIpGateway, D: DnsGateway> CheckRecordsUseCase for CheckRecords<P, 
             .iter()
             .map(|record| self.check(record, public_ip))
             .collect();
+
         Ok(Report { public_ip, records })
     }
 }
@@ -44,6 +45,7 @@ impl<P: PublicIpGateway, D: DnsGateway> CheckRecords<P, D> {
             Ok(current) => outcome_of(current, record, public_ip),
             Err(error) => Outcome::Failed(error),
         };
+
         RecordOutcome {
             record: record.clone(),
             outcome,
@@ -55,5 +57,6 @@ fn outcome_of(current: PublishedRecord, record: &TrackedRecord, public_ip: Publi
     if current.is_up_to_date(record, public_ip) {
         return Outcome::Unchanged;
     }
+
     Outcome::Drifted { current }
 }

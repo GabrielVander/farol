@@ -18,6 +18,7 @@ impl TryFrom<&str> for RecordName {
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         validate(value)?;
+
         Ok(Self(value.to_ascii_lowercase()))
     }
 }

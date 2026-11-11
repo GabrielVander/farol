@@ -22,6 +22,7 @@ impl<P: PublicIpGateway, D: DnsGateway> SyncRecordsUseCase for SyncRecords<P, D>
             .iter()
             .map(|record| self.sync(record, public_ip))
             .collect();
+
         Ok(Report { public_ip, records })
     }
 }
@@ -45,6 +46,7 @@ impl<P: PublicIpGateway, D: DnsGateway> SyncRecords<P, D> {
             Ok(current) => self.point(record, public_ip, current),
             Err(error) => Outcome::Failed(error),
         };
+
         RecordOutcome {
             record: record.clone(),
             outcome,
