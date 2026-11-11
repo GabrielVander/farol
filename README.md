@@ -128,6 +128,32 @@ cargo llvm-cov --workspace
 
 A new DNS provider is a new slice crate that implements `DnsGateway`.
 
+Every arrow points inward, toward `lib-core`. The core defines the gateway
+traits, the slice crates implement them, and only `app-cli` knows about all of
+them. Dashed arrows are test-only dependencies.
+
+```mermaid
+flowchart LR
+    cli["app-cli<br/>(farol binary)"]
+    core["lib-core<br/>entities, use cases,<br/>gateway traits"]
+    ipify["lib-ipify"]
+    hostinger["lib-hostinger"]
+    testing["lib-core-testing<br/>fakes, fixtures"]
+    ipifyApi(["ipify API"])
+    hostingerApi(["Hostinger DNS API"])
+
+    cli -- "runs check / sync" --> core
+    cli -- "wires in" --> ipify
+    cli -- "wires in" --> hostinger
+    ipify -- "implements PublicIpGateway" --> core
+    hostinger -- "implements DnsGateway" --> core
+    testing -- "fakes the gateways" --> core
+    core -.-> testing
+    cli -.-> testing
+    ipify -- "HTTPS (ureq)" --> ipifyApi
+    hostinger -- "HTTPS (ureq)" --> hostingerApi
+```
+
 ### Project layout
 
 ```
