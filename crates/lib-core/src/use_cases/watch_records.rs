@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use crate::{
-    entities::tracked_record::TrackedRecord,
+    entities::{public_ip::PublicIp, tracked_record::TrackedRecord},
     use_cases::{
         ports::{
             dns_gateway::DnsGateway,
@@ -27,6 +27,12 @@ impl<P: PublicIpGateway, D: DnsGateway> WatchRecordsUseCase for WatchRecords<P, 
     ) -> Result<Option<Report>, PublicIpGatewayError> {
         let public_ip = self.public_ip_gateway.current_public_ip()?;
 
+        if self.last_synced == Some(public_ip) {
+            return Ok(None);
+        }
+
+        self.last_synced = Some(public_ip);
+
         Ok(Some(self.sync_records.sync_to(records, public_ip)))
     }
 }
@@ -34,6 +40,7 @@ impl<P: PublicIpGateway, D: DnsGateway> WatchRecordsUseCase for WatchRecords<P, 
 pub struct WatchRecords<P: PublicIpGateway, D: DnsGateway> {
     public_ip_gateway: Arc<P>,
     sync_records: SyncRecords<P, D>,
+    last_synced: Option<PublicIp>,
 }
 
 impl<P: PublicIpGateway, D: DnsGateway> WatchRecords<P, D> {
@@ -41,6 +48,7 @@ impl<P: PublicIpGateway, D: DnsGateway> WatchRecords<P, D> {
         Self {
             sync_records: SyncRecords::new(Arc::clone(&public_ip_gateway), dns_gateway),
             public_ip_gateway,
+            last_synced: None,
         }
     }
 }

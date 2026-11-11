@@ -31,3 +31,20 @@ fn should_sync_and_report_on_the_first_round() {
     assert_eq!(Ok(Some(expected)), report);
     assert_eq!(vec![(tracked("home"), public_ip())], dns_gateway.pointed());
 }
+
+#[test]
+fn should_skip_a_round_whose_public_ip_was_already_synced() {
+    let dns_gateway = Arc::new(FakeDnsGateway::default().with_addresses("home", &[OLD_ADDRESS]));
+    let mut watch_records = WatchRecords::new(
+        Arc::new(FakePublicIpGateway::default()),
+        Arc::clone(&dns_gateway),
+    );
+    watch_records
+        .execute(&[tracked("home")])
+        .expect("first round");
+
+    let report = watch_records.execute(&[tracked("home")]);
+
+    assert_eq!(Ok(None), report);
+    assert_eq!(vec![(tracked("home"), public_ip())], dns_gateway.pointed());
+}
