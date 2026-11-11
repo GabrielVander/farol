@@ -400,7 +400,7 @@ mod test {
             .expect("published")
             .addresses;
 
-        assert!(addresses.is_empty());
+        assert_eq!(Vec::<Ipv4Addr>::new(), addresses);
     }
 
     #[test]

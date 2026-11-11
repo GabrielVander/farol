@@ -12,7 +12,7 @@ use lib_core::use_cases::ports::{
 };
 use lib_core_testing::{
     fakes::{FakeDnsGateway, FakePublicIpGateway},
-    fixtures::{OLD_ADDRESS, PUBLIC_ADDRESS, public_ip, tracked},
+    fixtures::{OLD_ADDRESS, PUBLIC_ADDRESS, nothing_pointed, public_ip, tracked},
     scenario::Scenario,
 };
 
@@ -95,7 +95,7 @@ fn should_check_a_drifted_record_without_pointing_it() {
     let expected = "public IP 8.8.8.8\nhome.example.com: drifted (now 1.1.1.1, TTL 300)\n";
     assert_eq!(expected, termination.output);
     assert!(termination.success);
-    assert!(scenario.pointed().is_empty());
+    assert_eq!(nothing_pointed(), scenario.pointed());
 }
 
 #[test]

@@ -6,7 +6,7 @@ use lib_core::use_cases::{
     report::{Outcome, RecordOutcome},
 };
 use lib_core_testing::{
-    fixtures::{OLD_ADDRESS, PUBLIC_ADDRESS, public_ip, published, tracked},
+    fixtures::{OLD_ADDRESS, PUBLIC_ADDRESS, nothing_pointed, public_ip, published, tracked},
     scenario::Scenario,
 };
 
@@ -21,7 +21,7 @@ fn should_leave_an_unchanged_record_alone() {
         outcome: Outcome::Unchanged,
     };
     assert_eq!(vec![expected], report.records);
-    assert!(scenario.pointed().is_empty());
+    assert_eq!(nothing_pointed(), scenario.pointed());
 }
 
 #[test]
@@ -103,5 +103,5 @@ fn should_stop_when_the_public_ip_is_unavailable() {
     let scenario = Scenario::default().without_public_ip(error.clone());
 
     assert_eq!(Err(error), scenario.sync(&["home"]));
-    assert!(scenario.pointed().is_empty());
+    assert_eq!(nothing_pointed(), scenario.pointed());
 }

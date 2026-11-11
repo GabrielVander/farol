@@ -6,7 +6,7 @@ use lib_core::use_cases::{
     report::{Outcome, RecordOutcome},
 };
 use lib_core_testing::{
-    fixtures::{OLD_ADDRESS, PUBLIC_ADDRESS, published, tracked},
+    fixtures::{OLD_ADDRESS, PUBLIC_ADDRESS, nothing_pointed, published, tracked},
     scenario::Scenario,
 };
 
@@ -120,5 +120,5 @@ fn should_never_point_a_drifted_record() {
 
     scenario.check(&["home"]).expect("report");
 
-    assert!(scenario.pointed().is_empty());
+    assert_eq!(nothing_pointed(), scenario.pointed());
 }

@@ -26,6 +26,11 @@ pub fn tracked(name: &str) -> TrackedRecord {
     }
 }
 
+/// What `Scenario::pointed` holds when farol pointed no record.
+pub fn nothing_pointed() -> Vec<(TrackedRecord, PublicIp)> {
+    Vec::new()
+}
+
 /// A published record with the TTL `tracked` asks for, or none without addresses.
 pub fn published(addresses: &[Ipv4Addr]) -> PublishedRecord {
     PublishedRecord {
