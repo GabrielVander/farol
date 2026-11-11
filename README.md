@@ -4,7 +4,8 @@
 are. farol keeps DNS A records pointed at the machine's current public IP, so a
 home server stays reachable when the ISP changes the address.
 
-It runs once and exits. Schedule it with a systemd timer or cron.
+It runs once and exits, so you can schedule it with a systemd timer or cron. Or
+run `farol sync --watch` to keep it running.
 
 - **DNS providers:** Hostinger.
 - **Public IP source:** [ipify](https://www.ipify.org).
@@ -44,6 +45,7 @@ Either way, this installs the `farol` binary into `~/.cargo/bin`.
 ```sh
 farol check --provider hostinger --record example.com:home   # show drift, change nothing
 farol sync --provider hostinger --record example.com:home    # point drifted records at the public IP
+farol sync --watch --provider hostinger --record example.com:home   # and again whenever the public IP changes
 ```
 
 | Option | Meaning |
@@ -51,6 +53,8 @@ farol sync --provider hostinger --record example.com:home    # point drifted rec
 | `--provider` | The DNS provider. Required. `hostinger` is the only one so far. |
 | `--record DOMAIN:NAME` | A record to keep pointed at this machine. Required and repeatable. Use `@` as the name for the domain itself, and `*` or `*.home` for a wildcard. Quote wildcards so the shell leaves them alone: `--record 'example.com:*'`. |
 | `--ttl SECONDS` | The TTL every tracked record should have. Defaults to 300, so a record with any other TTL counts as drifted unless you pass its value here. |
+| `--watch` | `sync` only. Keep running instead of exiting. Stop with Ctrl+C. |
+| `--interval SECONDS` | With `--watch`, how often to check the public IP. Defaults to 300. |
 
 ```
 $ farol sync --provider hostinger --record example.com:@ --record example.com:home
@@ -64,6 +68,16 @@ the public IP (missing, different, or several) or its TTL differs from
 `--ttl`. Pointing a record replaces all
 of its A records with a single one holding the public IP and the `--ttl` value.
 Other record types and other names are left alone.
+
+### Watching
+
+`farol sync --watch` syncs once, then checks the public IP every `--interval`
+seconds. It prints a report only when it syncs again, which happens when the
+public IP changes or when a record failed in the previous sync. Otherwise it
+asks only ipify and leaves the DNS provider alone, so a record someone edits by
+hand stays as it is until the public IP changes. When the public IP can't be
+found, farol prints the error and tries again on the next check. A watch never
+exits on its own. Ctrl+C ends it, and the shell sees the usual interrupted status (130).
 
 ### Exit status
 
@@ -121,7 +135,7 @@ cargo llvm-cov --workspace
 
 | Crate | Role |
 |-------|------|
-| `lib-core` | Entities, use cases (check, sync) and gateway traits |
+| `lib-core` | Entities, use cases (check, sync, watch) and gateway traits |
 | `lib-ipify` | Finds the public IP through ipify |
 | `lib-hostinger` | Reads and points A records through Hostinger's DNS API |
 | `app-cli` | The `farol` command: arguments, output and wiring |
@@ -165,11 +179,12 @@ farol/
 │   │   │   │   ├── ports/            # dns_gateway, public_ip_gateway
 │   │   │   │   ├── check_records.rs
 │   │   │   │   ├── sync_records.rs
+│   │   │   │   ├── watch_records.rs
 │   │   │   │   └── report.rs
 │   │   │   ├── entities.rs
 │   │   │   ├── use_cases.rs
 │   │   │   └── lib.rs
-│   │   └── tests/                    # check_records, sync_records
+│   │   └── tests/                    # check_records, report, sync_records, watch_records
 │   ├── lib-core-testing/             # fakes and fixtures shared by the tests
 │   │   └── src/                      # fakes, fixtures, lib
 │   ├── lib-ipify/                    # PublicIpGateway through ipify
