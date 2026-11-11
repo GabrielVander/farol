@@ -14,5 +14,8 @@ lib-ipify = { workspace = true }
 lib-hostinger = { workspace = true }
 clap = { workspace = true }
 
+[dev-dependencies]
+lib-core-testing = { workspace = true }
+
 [lints]
 workspace = true
