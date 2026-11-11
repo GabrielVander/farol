@@ -5,8 +5,9 @@ use app_cli::{
     run::{Infrastructure, run},
     token::{HOSTINGER_TOKEN_VARIABLE, hostinger_token},
 };
-use lib_hostinger::infrastructure::{
-    adapters::hostinger_dns_gateway::HostingerDnsGateway, ureq_hostinger_api::UreqHostingerApi,
+use lib_hostinger::{
+    adapters::hostinger_dns_gateway::HostingerDnsGateway,
+    infrastructure::ureq_hostinger_api::UreqHostingerApi,
 };
 use lib_ipify::infrastructure::{
     adapters::ipify_public_ip_gateway::IpifyPublicIpGateway, ureq_ipify_api::UreqIpifyApi,

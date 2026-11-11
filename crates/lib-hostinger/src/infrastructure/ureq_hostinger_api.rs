@@ -2,8 +2,8 @@ use std::{fmt::Display, time::Duration};
 
 use ureq::{Agent, Body, http::Response};
 
-use crate::infrastructure::{
-    adapters::hostinger_api::{HostingerApi, HostingerApiError},
+use crate::adapters::{
+    hostinger_api::{HostingerApi, HostingerApiError},
     models::{ErrorBody, RecordSet, UpdateZoneRequest},
 };
 
@@ -103,10 +103,12 @@ mod test {
 
     use serde_json::{Value, json};
 
-    use crate::infrastructure::{
-        adapters::hostinger_api::{HostingerApi, HostingerApiError},
-        models::{RecordSet, RecordValue, UpdateZoneRequest},
-        ureq_hostinger_api::UreqHostingerApi,
+    use crate::{
+        adapters::{
+            hostinger_api::{HostingerApi, HostingerApiError},
+            models::{RecordSet, RecordValue, UpdateZoneRequest},
+        },
+        infrastructure::ureq_hostinger_api::UreqHostingerApi,
     };
 
     const TOKEN: &str = "secret-token";

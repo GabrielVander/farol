@@ -9,8 +9,8 @@ use lib_core::{
     use_cases::dns_gateway::{DnsGateway, DnsGatewayError, PublishedRecord},
 };
 
-use crate::infrastructure::{
-    adapters::hostinger_api::{HostingerApi, HostingerApiError},
+use crate::adapters::{
+    hostinger_api::{HostingerApi, HostingerApiError},
     models::{RecordSet, RecordValue, UpdateZoneRequest},
 };
 
@@ -155,11 +155,9 @@ mod test {
         use_cases::dns_gateway::{DnsGateway, DnsGatewayError},
     };
 
-    use crate::infrastructure::{
-        adapters::{
-            hostinger_api::{HostingerApi, HostingerApiError},
-            hostinger_dns_gateway::HostingerDnsGateway,
-        },
+    use crate::adapters::{
+        hostinger_api::{HostingerApi, HostingerApiError},
+        hostinger_dns_gateway::HostingerDnsGateway,
         models::{RecordSet, RecordValue, UpdateZoneRequest},
     };
 

@@ -1,4 +1,4 @@
-use crate::infrastructure::models::{RecordSet, UpdateZoneRequest};
+use crate::adapters::models::{RecordSet, UpdateZoneRequest};
 
 /// The parts of Hostinger's DNS API that farol uses.
 pub trait HostingerApi {
