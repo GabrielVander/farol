@@ -24,14 +24,6 @@ pub fn render(report: &Report) -> String {
         .fold(header, |text, line| text + &line)
 }
 
-/// Whether any tracked record failed, which makes the whole run fail.
-pub fn has_failures(report: &Report) -> bool {
-    report
-        .records
-        .iter()
-        .any(|record_outcome| matches!(record_outcome.outcome, Outcome::Failed(_)))
-}
-
 /// Why no record could be checked: the public IP is unknown.
 pub fn explain_public_ip_error(error: &PublicIpGatewayError) -> String {
     let reason = match error {
@@ -132,7 +124,7 @@ mod test {
         },
     };
 
-    use crate::adapters::presenters::report_view::{explain_public_ip_error, has_failures, render};
+    use crate::adapters::presenters::report_view::{explain_public_ip_error, render};
 
     fn public_ip() -> PublicIp {
         PublicIp::try_from(Ipv4Addr::new(8, 8, 8, 8)).expect("public ip")
@@ -293,30 +285,6 @@ mod test {
                 record_line(&report_with("home", Outcome::Failed(error)))
             );
         }
-    }
-
-    #[test]
-    fn should_have_no_failures_when_every_record_succeeded() {
-        let report = report_with(
-            "home",
-            Outcome::Pointed {
-                previous: published(vec![]),
-            },
-        );
-
-        assert!(!has_failures(&report));
-    }
-
-    #[test]
-    fn should_have_failures_when_any_record_failed() {
-        let mut report = report_with("home", Outcome::Unchanged);
-        let failed = report_with(
-            "lab",
-            Outcome::Failed(DnsGatewayError::Unavailable("timeout".to_owned())),
-        );
-        report.records.extend(failed.records);
-
-        assert!(has_failures(&report));
     }
 
     #[test]

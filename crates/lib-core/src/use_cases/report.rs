@@ -10,6 +10,15 @@ pub struct Report {
     pub records: Vec<RecordOutcome>,
 }
 
+impl Report {
+    /// Whether any tracked record failed.
+    pub fn has_failures(&self) -> bool {
+        self.records
+            .iter()
+            .any(|record_outcome| matches!(record_outcome.outcome, Outcome::Failed(_)))
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RecordOutcome {
     pub record: TrackedRecord,

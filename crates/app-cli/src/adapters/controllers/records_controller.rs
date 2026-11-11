@@ -11,7 +11,7 @@ use crate::adapters::{
     controllers::record_arguments::tracked_records,
     presenters::{
         record_arguments_view::explain_record_argument_error,
-        report_view::{explain_public_ip_error, has_failures, render},
+        report_view::{explain_public_ip_error, render},
     },
 };
 
@@ -56,7 +56,7 @@ pub struct Termination {
 impl Termination {
     fn reported(report: &Report) -> Self {
         Self {
-            success: !has_failures(report),
+            success: !report.has_failures(),
             output: render(report),
             error: String::new(),
         }
