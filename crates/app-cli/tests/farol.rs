@@ -6,9 +6,10 @@ use app_cli::{
     command_line::Provider,
     run::{Infrastructure, Termination, run},
 };
+use lib_core::use_cases::dns_gateway::DnsGatewayError;
 use lib_core_testing::{
     fakes::{FakeDnsGateway, FakePublicIpGateway},
-    fixtures::PUBLIC_ADDRESS,
+    fixtures::{OLD_ADDRESS, PUBLIC_ADDRESS, public_ip, tracked},
     scenario::Scenario,
 };
 
@@ -47,4 +48,53 @@ fn should_check_an_unchanged_record_and_succeed() {
         error: String::new(),
     };
     assert_eq!(expected, termination);
+}
+
+#[test]
+fn should_check_a_drifted_record_without_pointing_it() {
+    let scenario = Scenario::default().publishing("home", &[OLD_ADDRESS]);
+
+    let termination = farol(
+        &scenario,
+        "check --provider hostinger --record example.com:home",
+    );
+
+    let expected = "public IP 8.8.8.8\nhome.example.com: drifted (now 1.1.1.1, TTL 300)\n";
+    assert_eq!(expected, termination.output);
+    assert!(termination.success);
+    assert!(scenario.pointed().is_empty());
+}
+
+#[test]
+fn should_sync_a_drifted_record_by_pointing_it() {
+    let scenario = Scenario::default().publishing("home", &[OLD_ADDRESS]);
+
+    let termination = farol(
+        &scenario,
+        "sync --provider hostinger --record example.com:home",
+    );
+
+    let expected = "public IP 8.8.8.8\nhome.example.com: pointed (was 1.1.1.1, TTL 300)\n";
+    assert_eq!(expected, termination.output);
+    assert!(termination.success);
+    assert_eq!(vec![(tracked("home"), public_ip())], scenario.pointed());
+}
+
+#[test]
+fn should_report_every_record_but_fail_when_one_fails() {
+    let error = DnsGatewayError::Unavailable("timeout".to_owned());
+    let scenario = Scenario::default()
+        .failing_to_read("home", error)
+        .publishing("lab", &[PUBLIC_ADDRESS]);
+
+    let termination = farol(
+        &scenario,
+        "check --provider hostinger --record example.com:home --record example.com:lab",
+    );
+
+    let expected = "public IP 8.8.8.8\n\
+        home.example.com: failed, the DNS provider is unavailable (timeout)\n\
+        lab.example.com: unchanged\n";
+    assert_eq!(expected, termination.output);
+    assert!(!termination.success);
 }
