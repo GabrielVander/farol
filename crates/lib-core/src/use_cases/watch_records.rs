@@ -1,0 +1,46 @@
+use std::sync::Arc;
+
+use crate::{
+    entities::tracked_record::TrackedRecord,
+    use_cases::{
+        ports::{
+            dns_gateway::DnsGateway,
+            public_ip_gateway::{PublicIpGateway, PublicIpGatewayError},
+        },
+        report::Report,
+        sync_records::SyncRecords,
+    },
+};
+
+pub trait WatchRecordsUseCase {
+    /// Runs one round of the watch. `None` means nothing needed syncing.
+    fn execute(
+        &mut self,
+        records: &[TrackedRecord],
+    ) -> Result<Option<Report>, PublicIpGatewayError>;
+}
+
+impl<P: PublicIpGateway, D: DnsGateway> WatchRecordsUseCase for WatchRecords<P, D> {
+    fn execute(
+        &mut self,
+        records: &[TrackedRecord],
+    ) -> Result<Option<Report>, PublicIpGatewayError> {
+        let public_ip = self.public_ip_gateway.current_public_ip()?;
+
+        Ok(Some(self.sync_records.sync_to(records, public_ip)))
+    }
+}
+
+pub struct WatchRecords<P: PublicIpGateway, D: DnsGateway> {
+    public_ip_gateway: Arc<P>,
+    sync_records: SyncRecords<P, D>,
+}
+
+impl<P: PublicIpGateway, D: DnsGateway> WatchRecords<P, D> {
+    pub fn new(public_ip_gateway: Arc<P>, dns_gateway: Arc<D>) -> Self {
+        Self {
+            sync_records: SyncRecords::new(Arc::clone(&public_ip_gateway), dns_gateway),
+            public_ip_gateway,
+        }
+    }
+}
