@@ -1,8 +1,4 @@
-use std::{
-    collections::HashMap,
-    net::Ipv4Addr,
-    sync::{Arc, Mutex},
-};
+use std::{collections::HashMap, net::Ipv4Addr, sync::Mutex};
 
 use lib_core::{
     entities::{public_ip::PublicIp, tracked_record::TrackedRecord},
@@ -29,12 +25,12 @@ impl PublicIpGateway for FakePublicIpGateway {
     }
 }
 
-/// A DNS provider holding records by name. Clones share what was pointed.
-#[derive(Debug, Clone, Default)]
+/// A DNS provider holding records by name.
+#[derive(Debug, Default)]
 pub struct FakeDnsGateway {
     published: HashMap<String, Result<PublishedRecord, DnsGatewayError>>,
     point_failures: HashMap<String, DnsGatewayError>,
-    pointed: Arc<Mutex<Vec<(TrackedRecord, PublicIp)>>>,
+    pointed: Mutex<Vec<(TrackedRecord, PublicIp)>>,
 }
 
 impl FakeDnsGateway {
