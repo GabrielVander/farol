@@ -234,6 +234,85 @@ fn should_watch_and_show_a_report_only_when_the_public_ip_changes() {
 }
 
 #[test]
+fn should_wait_the_given_interval_between_watch_rounds() {
+    let infrastructure = FakeInfrastructure {
+        ticks: 1,
+        ..FakeInfrastructure::default()
+    };
+
+    farol(&infrastructure, &format!("{WATCH_HOME} --interval 60"));
+
+    assert_eq!(vec![Duration::from_secs(60)], infrastructure.waits());
+}
+
+#[test]
+fn should_show_a_public_ip_error_and_keep_watching() {
+    let error = PublicIpGatewayError::Unavailable("offline".to_owned());
+    let infrastructure = FakeInfrastructure {
+        public_ip_gateway: Arc::new(FakePublicIpGateway::answering(vec![
+            Err(error),
+            Ok(public_ip()),
+        ])),
+        ticks: 1,
+        ..FakeInfrastructure::default()
+    };
+
+    let response = farol(&infrastructure, WATCH_HOME);
+
+    let expected = vec![
+        stopped("could not find the public IP: the public IP service is unavailable (offline)"),
+        reported("public IP 8.8.8.8\nhome.example.com: pointed (was no A record)\n"),
+    ];
+    assert_eq!(expected, infrastructure.shown());
+    assert!(response.success);
+}
+
+#[test]
+fn should_stop_on_an_invalid_record_argument_before_watching() {
+    let infrastructure = FakeInfrastructure {
+        ticks: 1,
+        ..FakeInfrastructure::default()
+    };
+
+    let response = farol(
+        &infrastructure,
+        "sync --watch --provider hostinger --record example.com",
+    );
+
+    let message =
+        "invalid record \"example.com\": expected DOMAIN:NAME, for example example.com:home";
+    assert_eq!(stopped(message), response);
+    assert_eq!(Vec::<Duration>::new(), infrastructure.waits());
+    assert_eq!(Vec::<Response>::new(), infrastructure.shown());
+}
+
+#[test]
+fn should_refuse_a_watch_interval_that_cannot_be_used() {
+    let refusals = [
+        (
+            "sync --provider hostinger --record example.com:home --interval 60",
+            ErrorKind::MissingRequiredArgument,
+        ),
+        (
+            "sync --watch --provider hostinger --record example.com:home --interval 0",
+            ErrorKind::ValueValidation,
+        ),
+        (
+            "check --watch --provider hostinger --record example.com:home",
+            ErrorKind::UnknownArgument,
+        ),
+    ];
+
+    for (arguments, kind) in refusals {
+        let error = FakeInfrastructure::default()
+            .run(arguments)
+            .expect_err(arguments);
+
+        assert_eq!(kind, error.kind(), "{arguments}");
+    }
+}
+
+#[test]
 fn should_refuse_a_command_line_without_records() {
     let infrastructure = FakeInfrastructure::default();
 
