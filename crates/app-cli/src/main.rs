@@ -1,9 +1,11 @@
 use std::{env, process::ExitCode, sync::Arc, time::Duration};
 
 use app_cli::{
-    command_line::Provider,
-    run::{Infrastructure, run},
-    token::{HOSTINGER_TOKEN_VARIABLE, hostinger_token},
+    adapters::controllers::run::{Infrastructure, run},
+    infrastructure::{
+        command_line::Provider,
+        token::{HOSTINGER_TOKEN_VARIABLE, hostinger_token},
+    },
 };
 use lib_hostinger::{
     adapters::hostinger_dns_gateway::HostingerDnsGateway,

@@ -9,10 +9,14 @@ use lib_core::use_cases::{
 };
 
 use crate::{
-    command_line::{Cli, Command, Provider},
-    record_arguments::tracked_records,
-    record_arguments_view::explain_record_argument_error,
-    report_view::{explain_public_ip_error, has_failures, render},
+    adapters::{
+        controllers::record_arguments::tracked_records,
+        presenters::{
+            record_arguments_view::explain_record_argument_error,
+            report_view::{explain_public_ip_error, has_failures, render},
+        },
+    },
+    infrastructure::command_line::{Cli, Command, Provider},
 };
 
 /// The outside world farol talks to. Production reaches real services; tests

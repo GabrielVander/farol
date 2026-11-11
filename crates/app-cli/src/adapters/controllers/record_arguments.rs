@@ -67,7 +67,7 @@ mod test {
         ttl::{Ttl, TtlError},
     };
 
-    use crate::record_arguments::{RecordArgumentError, tracked_records};
+    use crate::adapters::controllers::record_arguments::{RecordArgumentError, tracked_records};
 
     fn arguments(values: &[&str]) -> Vec<String> {
         values.iter().map(|value| (*value).to_owned()).collect()

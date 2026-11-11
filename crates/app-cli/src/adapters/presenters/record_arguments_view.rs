@@ -1,6 +1,6 @@
 use lib_core::entities::{domain_name::DomainNameError, label::LabelError, ttl::TtlError};
 
-use crate::record_arguments::RecordArgumentError;
+use crate::adapters::controllers::record_arguments::RecordArgumentError;
 
 /// What is wrong with a `--record` or `--ttl` argument.
 pub fn explain_record_argument_error(error: &RecordArgumentError) -> String {
@@ -45,8 +45,9 @@ fn ttl_problem(reason: &TtlError) -> &'static str {
 mod test {
     use lib_core::entities::{domain_name::DomainNameError, label::LabelError, ttl::TtlError};
 
-    use crate::{
-        record_arguments::RecordArgumentError, record_arguments_view::explain_record_argument_error,
+    use crate::adapters::{
+        controllers::record_arguments::RecordArgumentError,
+        presenters::record_arguments_view::explain_record_argument_error,
     };
 
     #[test]

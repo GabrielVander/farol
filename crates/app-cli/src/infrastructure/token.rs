@@ -14,7 +14,7 @@ pub fn hostinger_token(
 
 #[cfg(test)]
 mod test {
-    use crate::token::{MissingToken, hostinger_token};
+    use crate::infrastructure::token::{MissingToken, hostinger_token};
 
     #[test]
     fn should_read_the_hostinger_token_from_the_environment() {

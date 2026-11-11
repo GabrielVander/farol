@@ -46,7 +46,7 @@ pub enum Provider {
 mod test {
     use clap::CommandFactory;
 
-    use crate::command_line::Cli;
+    use crate::infrastructure::command_line::Cli;
 
     #[test]
     fn should_define_a_valid_command_line() {

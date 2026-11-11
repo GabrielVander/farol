@@ -3,8 +3,8 @@
 use std::sync::Arc;
 
 use app_cli::{
-    command_line::Provider,
-    run::{Infrastructure, Termination, run},
+    adapters::controllers::run::{Infrastructure, Termination, run},
+    infrastructure::command_line::Provider,
 };
 use clap::error::ErrorKind;
 use lib_core::use_cases::ports::{

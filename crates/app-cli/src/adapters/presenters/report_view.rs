@@ -128,7 +128,7 @@ mod test {
         },
     };
 
-    use crate::report_view::{explain_public_ip_error, has_failures, render};
+    use crate::adapters::presenters::report_view::{explain_public_ip_error, has_failures, render};
 
     fn public_ip() -> PublicIp {
         PublicIp::try_from(Ipv4Addr::new(8, 8, 8, 8)).expect("public ip")
